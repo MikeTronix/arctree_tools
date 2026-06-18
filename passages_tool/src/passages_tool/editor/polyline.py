@@ -53,6 +53,8 @@ from passages_tool.config import (
     COLOR_WALL,
     COLOR_WALL_NO_INTERVAL,
     COLOR_WALL_SELECTED,
+    COLOR_ANCHOR,
+    COLOR_ANCHOR_SELECTED,
     HATCH_LENGTH,
     HATCH_MIN_EDGE,
     INTERVAL_COLORS,
@@ -110,6 +112,8 @@ class PolylineNode:
             self._build_arch()
         elif t == PolylineType.EYEPATH:
             self._build_eyepath()
+        elif t == PolylineType.ANCHOR:
+            self._build_anchor()
         else:
             self._build_wall()   # safe fallback
 
@@ -289,6 +293,44 @@ class PolylineNode:
         np = self._geo_np.attachNewNode(segs.create(dynamic=True))
         np.setBin("opaque", 1)
 
+    def _build_anchor(self) -> None:
+        verts = self._data.vertices
+        if not verts:
+            return
+
+        color  = (1.0, 0.2, 0.2, 1.0) if self._highlighted_error else (COLOR_ANCHOR_SELECTED if self._selected else COLOR_ANCHOR)
+        px, pz = verts[0]
+
+        segs = LineSegs("anchor_main")
+        segs.setThickness(POLYLINE_THICKNESS)
+        segs.setColor(LColor(*color))
+
+        # 1. Draw small center circle
+        r_center = 0.15
+        segs.moveTo(px + r_center, 0, pz)
+        for i in range(1, 17):
+            ang = i * 2 * math.pi / 16
+            segs.drawTo(px + r_center * math.cos(ang), 0, pz + r_center * math.sin(ang))
+
+        # 2. Draw crosshairs
+        cross_len = 0.3
+        segs.moveTo(px - cross_len, 0, pz)
+        segs.drawTo(px + cross_len, 0, pz)
+        segs.moveTo(px, 0, pz - cross_len)
+        segs.drawTo(px, 0, pz + cross_len)
+
+        # 3. Draw dashed bounding radius outline
+        r_bound = self._data.radius
+        if r_bound > 0.0:
+            for i in range(32):
+                ang1 = i * 2 * math.pi / 32
+                ang2 = (i + 0.5) * 2 * math.pi / 32
+                segs.moveTo(px + r_bound * math.cos(ang1), 0, pz + r_bound * math.sin(ang1))
+                segs.drawTo(px + r_bound * math.cos(ang2), 0, pz + r_bound * math.sin(ang2))
+
+        np = self._geo_np.attachNewNode(segs.create(dynamic=True))
+        np.setBin("opaque", 1)
+
     # ── Shared helpers ────────────────────────────────────────────────────────
 
     def _add_arrowhead(
@@ -325,6 +367,8 @@ class PolylineNode:
             unsel_color = COLOR_ARCH
         elif t == PolylineType.EYEPATH:
             unsel_color = COLOR_EYEPATH
+        elif t == PolylineType.ANCHOR:
+            unsel_color = COLOR_ANCHOR
         else:
             unsel_color = COLOR_WALL
 

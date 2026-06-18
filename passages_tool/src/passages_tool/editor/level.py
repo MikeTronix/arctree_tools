@@ -84,6 +84,7 @@ class PolylineType(Enum):
     WALL    = "wall"
     ARCH    = "arch"
     EYEPATH = "eyepath"
+    ANCHOR  = "anchor"
 
 
 # ── Supporting data classes ───────────────────────────────────────────────────
@@ -193,6 +194,12 @@ class Polyline:
     light_intensity: float = 1.0
     warning:        bool = False
 
+    # ── ANCHOR ───────────────────────────────────────────────────────────────
+    radius:         float = 0.5
+    max_distance:   float = 10.0
+    fov_limit:      Optional[float] = None
+    sprite_count:   int = 1
+
     # ── Convenience properties ────────────────────────────────────────────────
 
     @property
@@ -228,6 +235,12 @@ class Polyline:
     def make_eyepath() -> "Polyline":
         return Polyline(id=str(uuid.uuid4()), type=PolylineType.EYEPATH)
 
+    @staticmethod
+    def make_anchor(position: tuple[float, float] = (0.0, 0.0)) -> "Polyline":
+        pl = Polyline(id=str(uuid.uuid4()), type=PolylineType.ANCHOR)
+        pl.vertices = [tuple(position)]
+        return pl
+
     # ── Serialisation helpers ─────────────────────────────────────────────────
 
     def to_dict(self) -> dict:
@@ -261,6 +274,14 @@ class Polyline:
         elif self.type == PolylineType.EYEPATH:
             d["vertices"] = [list(v) for v in self.vertices]
             d["edges"]    = [list(e) for e in self.edges]
+        elif self.type == PolylineType.ANCHOR:
+            pos = self.vertices[0] if self.vertices else (0.0, 0.0)
+            d["position"]       = list(pos)
+            d["z_offset"]       = self.z_offset
+            d["radius"]         = self.radius
+            d["max_distance"]   = self.max_distance
+            d["fov_limit"]      = self.fov_limit
+            d["sprite_count"]   = self.sprite_count
         return d
 
     @staticmethod
@@ -309,6 +330,21 @@ class Polyline:
                 vertices = [tuple(v) for v in pd.get("vertices", [])],
                 edges    = [tuple(e) for e in pd.get("edges", [])],
             )
+
+        elif pl_type == PolylineType.ANCHOR:
+            pos = tuple(pd.get("position", [0.0, 0.0]))
+            pl  = Polyline(
+                id             = pd["id"],
+                type           = pl_type,
+                vertices       = [pos],
+                z_offset       = float(pd.get("z_offset", 0.0)),
+                radius         = float(pd.get("radius", 0.5)),
+                max_distance   = float(pd.get("max_distance", 10.0)),
+                fov_limit      = pd.get("fov_limit"),
+                sprite_count   = int(pd.get("sprite_count", 1)),
+            )
+            if pl.fov_limit is not None:
+                pl.fov_limit = float(pl.fov_limit)
 
         else:
             raise ValueError(f"Unknown polyline type: {pl_type!r}")

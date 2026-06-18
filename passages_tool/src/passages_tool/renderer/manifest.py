@@ -6,11 +6,20 @@ Builds, saves, and inspects the render manifest JSON for a level.
 from __future__ import annotations
 
 import json
+import math
 import re
 from pathlib import Path
 from typing import Any, Optional
 
 from passages_tool.editor.level import Level, PolylineType
+
+
+def ccw(A: tuple[float, float], B: tuple[float, float], C: tuple[float, float]) -> bool:
+    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+
+
+def segments_intersect(A: tuple[float, float], B: tuple[float, float], C: tuple[float, float], D: tuple[float, float]) -> bool:
+    return (ccw(A, C, D) != ccw(B, C, D)) and (ccw(A, B, C) != ccw(A, B, D))
 
 
 def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str, Any]:
@@ -49,13 +58,123 @@ def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str,
         if output_dir is not None:
             rendered = (Path(output_dir) / image_name).is_file()
 
+        # Calculate visible anchors
+        visible_anchors = {}
+        for anchor in level.polylines.values():
+            if anchor.type != PolylineType.ANCHOR:
+                continue
+            if not anchor.vertices:
+                continue
+
+            ax, ay = anchor.vertices[0]
+            dx_rel = ax - p_from[0]
+            dy_rel = ay - p_from[1]
+            dist = math.hypot(dx_rel, dy_rel)
+
+            max_dist = min(anchor.max_distance, level.meta.fog_end)
+            if dist > max_dist or dist < 0.1:
+                continue
+
+            # View direction vector
+            vx = p_to[0] - p_from[0]
+            vy = p_to[1] - p_from[1]
+            v_len = math.hypot(vx, vy)
+            if v_len == 0.0:
+                continue
+            vx /= v_len
+            vy /= v_len
+
+            # Relative direction to anchor
+            ux = dx_rel / dist
+            uy = dy_rel / dist
+
+            # Angle check
+            cos_theta = vx * ux + vy * uy
+            cos_theta = min(1.0, max(-1.0, cos_theta))
+            theta_rad = math.acos(cos_theta)
+
+            fov_limit = anchor.fov_limit if anchor.fov_limit is not None else (level.meta.fov_h * 0.5)
+            if math.degrees(theta_rad) > fov_limit:
+                continue
+
+            # Line-of-sight check (segment intersection)
+            p_start = (p_from[0] + 0.01 * dx_rel, p_from[1] + 0.01 * dy_rel)
+            p_end = (ax - 0.01 * dx_rel, ay - 0.01 * dy_rel)
+
+            blocked = False
+            for pl in level.polylines.values():
+                if pl.type == PolylineType.WALL:
+                    for i in range(len(pl.vertices) - 1):
+                        w1 = pl.vertices[i]
+                        w2 = pl.vertices[i+1]
+                        if segments_intersect(p_start, p_end, w1, w2):
+                            blocked = True
+                            break
+                    if blocked:
+                        break
+                    if pl.closed and len(pl.vertices) >= 3:
+                        w1 = pl.vertices[-1]
+                        w2 = pl.vertices[0]
+                        if segments_intersect(p_start, p_end, w1, w2):
+                            blocked = True
+                            break
+                elif pl.type == PolylineType.ARCH and pl.transparency == "none":
+                    if pl.vertices:
+                        arch_pos = pl.vertices[0]
+                        try:
+                            if pl.orientation != "billboard":
+                                half_w = pl.width * 0.5
+                                ang = math.radians(float(pl.orientation) + 90.0)
+                                adx = math.cos(ang) * half_w
+                                adz = math.sin(ang) * half_w
+                                a1 = (arch_pos[0] - adx, arch_pos[1] - adz)
+                                a2 = (arch_pos[0] + adx, arch_pos[1] + adz)
+                                if segments_intersect(p_start, p_end, a1, a2):
+                                    blocked = True
+                                    break
+                        except ValueError:
+                            pass
+
+            if blocked:
+                continue
+
+            # Projection math
+            fx, fy = vx, vy
+            rx, ry = fy, -fx
+
+            cam_z = level.meta.eye_height
+            anchor_z = anchor.z_offset
+            dz_rel = anchor_z - cam_z
+
+            depth = dx_rel * fx + dy_rel * fy
+            x_cam = dx_rel * rx + dy_rel * ry
+            y_cam = dz_rel
+
+            if depth < 0.1:
+                continue
+
+            w_half = math.tan(math.radians(level.meta.fov_h) * 0.5)
+            h_half = math.tan(math.radians(level.meta.fov_v) * 0.5)
+
+            screen_x = x_cam / (depth * w_half)
+            screen_y = y_cam / (depth * h_half)
+            scale = 1.0 / depth
+
+            visible_anchors[anchor.id] = {
+                "screen_x": round(screen_x, 4),
+                "screen_y": round(screen_y, 4),
+                "scale": round(scale, 4),
+                "distance": round(dist, 3)
+            }
+
         manifest[key] = {
             "image_path": image_name,
             "eyepoint_xyz": [p_from[0], p_from[1], eye_height],
             "facing_xyz": [p_to[0], p_to[1], eye_height],
             "rendered": rendered,
-            "flicker": None,  # Can be populated by game editor/logic later
-            "exit": None,     # Can be populated by game editor/logic later
+            "flicker": None,
+            "exit": None,
+            "visible_anchors": visible_anchors,
         }
 
     return manifest

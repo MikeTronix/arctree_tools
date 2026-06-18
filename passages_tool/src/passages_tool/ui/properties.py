@@ -46,8 +46,8 @@ from passages_tool.config import (
 from passages_tool.editor.level import Level, Polyline, PolylineType
 
 
-_TYPE_LABELS = ["Wall", "Arch", "EyePath"]
-_TYPE_VALUES = ["wall", "arch", "eyepath"]
+_TYPE_LABELS = ["Wall", "Arch", "EyePath", "Anchor"]
+_TYPE_VALUES = ["wall", "arch", "eyepath", "anchor"]
 _TRANS_LABELS = ["None", "Alpha test", "Alpha blend"]
 _TRANS_VALUES = ["none", "alpha_test", "alpha_blend"]
 
@@ -177,6 +177,8 @@ class PropertiesPanel:
             self._draw_arch_props(imgui, polyline, palette_sel)
         elif t == PolylineType.EYEPATH:
             self._draw_eyepath_props(imgui, polyline)
+        elif t == PolylineType.ANCHOR:
+            self._draw_anchor_props(imgui, polyline)
 
         # ── Delete polyline (all types) ───────────────────────────────────────
         imgui.separator()
@@ -571,6 +573,83 @@ class PropertiesPanel:
                 # Display 3D preview image (aspect ratio 4:3, fit in properties panel width)
                 # PROPS_PANEL_W is 320, minus padding is 304 width, 228 height
                 imgui.image(self._preview_image_ref, (304, 228))
+
+    # ── ANCHOR ────────────────────────────────────────────────────────────────
+
+    def _draw_anchor_props(self, imgui, polyline: Polyline) -> None:
+        # ── Position ──────────────────────────────────────────────────────────
+        imgui.text_colored((0.91, 0.25, 0.78, 1.0), "Position")
+        if polyline.vertices:
+            px, pz = polyline.vertices[0]
+            imgui.set_next_item_width(100)
+            cx, nx = imgui.input_float("x##anchor_px", px, format="%.2f")
+            imgui.same_line()
+            imgui.set_next_item_width(100)
+            cz, nz = imgui.input_float("y##anchor_py", pz, format="%.2f")
+            if cx or cz:
+                fn = self._cb.get("move_vertex")
+                if fn:
+                    fn(polyline.id, 0,
+                       nx if cx else px,
+                       nz if cz else pz)
+
+        imgui.separator()
+
+        # ── Anchor Settings ───────────────────────────────────────────────────
+        imgui.text_colored((0.91, 0.25, 0.78, 1.0), "Settings")
+
+        # Radius
+        imgui.set_next_item_width(-1)
+        r_changed, new_r = imgui.input_float(
+            "Radius##anchor", polyline.radius, step=0.1, format="%.2f")
+        if r_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                fn(polyline.id, "radius", max(0.01, new_r))
+
+        # height offset (z_offset)
+        imgui.set_next_item_width(-1)
+        z_changed, new_z = imgui.input_float(
+            "Height Offset##anchor", polyline.z_offset, step=0.1, format="%.2f")
+        if z_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                fn(polyline.id, "z_offset", new_z)
+
+        # max_distance
+        imgui.set_next_item_width(-1)
+        md_changed, new_md = imgui.input_float(
+            "Max Distance##anchor", polyline.max_distance, step=0.5, format="%.1f")
+        if md_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                fn(polyline.id, "max_distance", max(0.1, new_md))
+
+        # fov_limit (None vs float)
+        use_fov_limit = polyline.fov_limit is not None
+        fl_toggle_changed, new_use_fl = imgui.checkbox("Limit horizontal angle", use_fov_limit)
+        if fl_toggle_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                fn(polyline.id, "fov_limit", 45.0 if new_use_fl else None)
+
+        if use_fov_limit:
+            curr_fl = float(polyline.fov_limit) if polyline.fov_limit is not None else 45.0
+            imgui.set_next_item_width(-1)
+            fl_changed, new_fl = imgui.slider_float(
+                "Max Angle Offset##anchor", curr_fl, 1.0, 180.0, "%.1f deg")
+            if fl_changed:
+                fn = self._cb.get("set_field")
+                if fn:
+                    fn(polyline.id, "fov_limit", new_fl)
+
+        # sprite_count
+        imgui.set_next_item_width(-1)
+        sc_changed, new_sc = imgui.input_int("Sprite Capacity##anchor", polyline.sprite_count)
+        if sc_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                fn(polyline.id, "sprite_count", max(1, new_sc))
 
     # ── Shared helpers ────────────────────────────────────────────────────────
 

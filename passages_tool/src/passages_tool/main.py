@@ -255,6 +255,7 @@ class PassagesApp(ShowBase):
         self.accept("w",          lambda: self.set_tool(ToolMode.DRAW_WALL))
         self.accept("a",          lambda: self.set_tool(ToolMode.DRAW_ARCH))
         self.accept("e",          lambda: self.set_tool(ToolMode.DRAW_EYEPATH))
+        self.accept("r",          lambda: self.set_tool(ToolMode.DRAW_ANCHOR))
         self.accept("g",          self._toggle_snap)
         self.accept("v",          self._run_validation)
         self.accept("escape",     self._on_escape)
@@ -336,6 +337,16 @@ class PassagesApp(ShowBase):
             grid_size = self._level.meta.snap_grid
             wx = round(wx / grid_size) * grid_size
             wz = round(wz / grid_size) * grid_size
+
+        # ── Place Anchor: single click, immediate finish + select ─────────────
+        if self._tool == ToolMode.DRAW_ANCHOR:
+            pl = Polyline.make_anchor((wx, wz))
+            self._history.push(self._level.to_dict())
+            self._level.add_polyline(pl)
+            self._pm.sync_with_level(self._level.polylines)
+            self._pm.select(pl.id)
+            self._tool = ToolMode.SELECT
+            return
 
         # ── Place Arch: single click, immediate finish + select ───────────────
         if self._tool == ToolMode.DRAW_ARCH:
@@ -542,7 +553,7 @@ class PassagesApp(ShowBase):
     def set_tool(self, tool: ToolMode) -> None:
         if self._arch_snap_pending:
             self._confirm_arch_snap(accept=True)
-        _draw_modes = {ToolMode.DRAW_WALL, ToolMode.DRAW_ARCH, ToolMode.DRAW_EYEPATH}
+        _draw_modes = {ToolMode.DRAW_WALL, ToolMode.DRAW_ARCH, ToolMode.DRAW_EYEPATH, ToolMode.DRAW_ANCHOR}
         if self._tool in _draw_modes and tool not in _draw_modes:
             # Leaving a draw mode → finish whatever is in progress.
             self._finish_draw()

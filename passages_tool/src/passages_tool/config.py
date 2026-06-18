@@ -49,6 +49,8 @@ COLOR_ARCH          = (0.25, 0.82, 0.91, 1.0)
 COLOR_ARCH_SELECTED = (0.45, 0.97, 1.00, 1.0)
 COLOR_EYEPATH       = (0.28, 0.91, 0.50, 1.0)
 COLOR_EYEPATH_SEL   = (0.50, 1.00, 0.68, 1.0)
+COLOR_ANCHOR        = (0.91, 0.25, 0.78, 1.0)
+COLOR_ANCHOR_SELECTED = (1.00, 0.40, 0.95, 1.0)
 
 # ── Wall interior-side hatch ticks ────────────────────────────────────────────
 

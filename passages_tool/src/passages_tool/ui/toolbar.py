@@ -23,6 +23,7 @@ class ToolMode(Enum):
     DRAW_WALL    = auto()
     DRAW_ARCH    = auto()
     DRAW_EYEPATH = auto()
+    DRAW_ANCHOR  = auto()
 
 
 # Colour shown in the menu bar for each active draw mode (matches Phase-2 colours).
@@ -31,6 +32,7 @@ _MODE_COLORS = {
     ToolMode.DRAW_WALL:    (1.00, 0.92, 0.35, 1.0),   # warm yellow
     ToolMode.DRAW_ARCH:    (0.35, 0.95, 1.00, 1.0),   # cyan
     ToolMode.DRAW_EYEPATH: (0.40, 1.00, 0.60, 1.0),   # spring green
+    ToolMode.DRAW_ANCHOR:  (1.00, 0.40, 0.95, 1.0),   # magenta
 }
 
 
@@ -98,6 +100,7 @@ class Toolbar:
             (ToolMode.DRAW_WALL,    "Draw Wall",    "W"),
             (ToolMode.DRAW_ARCH,    "Place Arch",   "A"),
             (ToolMode.DRAW_EYEPATH, "Draw EyePath", "E"),
+            (ToolMode.DRAW_ANCHOR,  "Place Anchor", "R"),
         ]
 
         for mode, label, shortcut in _tools:
