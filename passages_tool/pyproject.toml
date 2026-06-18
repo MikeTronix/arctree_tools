@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passages-tool"
+version = "0.1.0"
+description = "2D level editor for the Passages minigame — view/edit polylines and tile textures"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+dependencies = [
+    "panda3d>=1.10.16",
+    "panda3d-imgui>=1.2.0",
+    "Pillow>=10.0",
+    "numpy>=1.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.0",
+]
+
+[project.scripts]
+passages-tool = "passages_tool.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"passages_tool" = ["assets/**/*", "icons/**/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

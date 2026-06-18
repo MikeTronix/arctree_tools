@@ -1,0 +1,95 @@
+{
+  "version": 2,
+  "meta": {
+    "name": "Lettuce",
+    "author": "MRW",
+    "wall_height": 4.0,
+    "eye_height": 1.7,
+    "fov_h": 90.0,
+    "fov_v": 60.0,
+    "pixels_per_meter": 256.0,
+    "fog_start": 20.0,
+    "fog_end": 40.0,
+    "snap_grid": 0.5,
+    "render_width": 800,
+    "render_height": 600,
+    "floor_texture": "floor.png",
+    "ceiling_texture": "elven_ceiling.png"
+  },
+  "grid": {
+    "cell_size": 1.0
+  },
+  "tiles": [],
+  "polylines": [
+    {
+      "id": "a22b75ef-9208-4b37-b691-9ba8234ef2b5",
+      "type": "wall",
+      "vertices": [
+        [
+          -6.0,
+          2.0
+        ],
+        [
+          5.0,
+          2.0
+        ],
+        [
+          5.0,
+          -2.0
+        ],
+        [
+          -6.0,
+          -2.0
+        ]
+      ],
+      "closed": false,
+      "texture_intervals": []
+    },
+    {
+      "id": "3d7e934c-066d-487d-a05c-0467243c6e07",
+      "type": "arch",
+      "position": [
+        -3.0,
+        0.0
+      ],
+      "orientation": 0.0,
+      "width": 4.0,
+      "height_override": null,
+      "texture": "elven_door.png",
+      "transparency": "alpha_test",
+      "z_offset": 0.0,
+      "v_at_floor": true,
+      "is_light_source": false,
+      "light_color": [
+        1.0,
+        0.75,
+        0.4
+      ],
+      "light_intensity": 1.0,
+      "warning": false
+    },
+    {
+      "id": "6158c063-d202-4389-be3b-0d2cb8127ebd",
+      "type": "arch",
+      "position": [
+        4.5,
+        0.0
+      ],
+      "orientation": "billboard",
+      "width": 4.0,
+      "height_override": null,
+      "texture": "arch_torch_alpha.png",
+      "transparency": "alpha_test",
+      "z_offset": 0.0,
+      "v_at_floor": true,
+      "is_light_source": true,
+      "light_color": [
+        1.0,
+        0.75,
+        0.4
+      ],
+      "light_intensity": 1.0,
+      "warning": false
+    }
+  ]
+}

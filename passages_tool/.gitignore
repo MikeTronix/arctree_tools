@@ -1,0 +1,59 @@
+# Python virtual environment
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Panda3D compiled files
+*.bam
+*.boo
+*.pyc
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# Pytest cache
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Tool outputs
+*.passages.json.bak
+logs/
+imgui.ini
+
+# Level JSON files (ignore specific/intermediate level files, keep universal test levels)
+json/*.passages.json
+!json/verify.passages.json
+!json/test.passages.json
+!json/test2.passages.json
+
+# Render and compile output directories
+renders_out/
+shipping_out/
+scene_out/
+test_out/
+temp_preview/
+screenshots/
+
+# Image assets
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.bmp
+*.tga
+*.tiff

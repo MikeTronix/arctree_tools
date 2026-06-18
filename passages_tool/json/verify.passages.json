@@ -1,0 +1,257 @@
+{
+  "version": 2,
+  "meta": {
+    "name": "Simplest",
+    "author": "MRW",
+    "wall_height": 4.0,
+    "eye_height": 1.7,
+    "fov_h": 90.0,
+    "fov_v": 60.0,
+    "pixels_per_meter": 256.0,
+    "fog_start": 20.0,
+    "fog_end": 40.0,
+    "snap_grid": 0.5,
+    "render_width": 800,
+    "render_height": 600,
+    "floor_texture": "floor.png",
+    "ceiling_texture": "ceiling_1.png"
+  },
+  "grid": {
+    "cell_size": 1.0
+  },
+  "tiles": [],
+  "polylines": [
+    {
+      "id": "0814ee05-d92e-4b75-a91c-e026f92b4278",
+      "type": "wall",
+      "vertices": [
+        [
+          -6.0,
+          1.0
+        ],
+        [
+          -3.0,
+          1.0
+        ],
+        [
+          -3.0,
+          3.5
+        ],
+        [
+          0.0,
+          6.0
+        ],
+        [
+          6.0,
+          6.0
+        ],
+        [
+          6.0,
+          3.0
+        ],
+        [
+          7.0,
+          3.0
+        ],
+        [
+          7.0,
+          0.0
+        ],
+        [
+          4.0,
+          0.0
+        ],
+        [
+          4.0,
+          3.0
+        ],
+        [
+          5.0,
+          3.0
+        ],
+        [
+          5.0,
+          5.0
+        ],
+        [
+          1.0,
+          5.0
+        ],
+        [
+          -2.0,
+          3.0
+        ],
+        [
+          -2.0,
+          1.0
+        ],
+        [
+          2.0,
+          1.0
+        ],
+        [
+          2.0,
+          -2.0
+        ],
+        [
+          4.0,
+          -2.0
+        ],
+        [
+          4.0,
+          -5.0
+        ],
+        [
+          -3.0,
+          -5.0
+        ],
+        [
+          -3.0,
+          -2.0
+        ],
+        [
+          0.0,
+          -1.5
+        ],
+        [
+          0.0,
+          0.0
+        ],
+        [
+          -6.0,
+          0.0
+        ]
+      ],
+      "closed": false,
+      "texture_intervals": [
+        {
+          "from_vertex": 0,
+          "to_vertex": 23,
+          "texture": "wall_stained.png",
+          "x_offset": 0.0
+        }
+      ]
+    },
+    {
+      "id": "b21ae648-65bc-4154-b5b4-3b78afac1f46",
+      "type": "arch",
+      "position": [
+        -1.0,
+        4.5
+      ],
+      "orientation": 39.80557109226519,
+      "width": 4.0,
+      "height_override": null,
+      "texture": "door_1.png",
+      "transparency": "alpha_test",
+      "z_offset": 0.0,
+      "v_at_floor": true,
+      "is_light_source": false,
+      "light_color": [
+        1.0,
+        0.75,
+        0.4
+      ],
+      "light_intensity": 1.0,
+      "warning": false
+    },
+    {
+      "id": "9f93a1aa-3821-4007-a301-eb9967b138e2",
+      "type": "arch",
+      "position": [
+        -1.5,
+        -4.5
+      ],
+      "orientation": "billboard",
+      "width": 4.0,
+      "height_override": null,
+      "texture": "arch_torch_alpha.png",
+      "transparency": "alpha_test",
+      "z_offset": 0.0,
+      "v_at_floor": true,
+      "is_light_source": false,
+      "light_color": [
+        1.0,
+        0.75,
+        0.4
+      ],
+      "light_intensity": 1.0,
+      "warning": false
+    },
+    {
+      "id": "b13b2205-7817-40bc-a176-d1995853f2de",
+      "type": "arch",
+      "position": [
+        2.5,
+        -4.5
+      ],
+      "orientation": "billboard",
+      "width": 4.0,
+      "height_override": null,
+      "texture": "arch_torch_alpha.png",
+      "transparency": "alpha_test",
+      "z_offset": 0.0,
+      "v_at_floor": true,
+      "is_light_source": false,
+      "light_color": [
+        1.0,
+        0.75,
+        0.4
+      ],
+      "light_intensity": 1.0,
+      "warning": false
+    },
+    {
+      "id": "caa21b17-271b-43e7-8749-a3e7e7641443",
+      "type": "eyepath",
+      "vertices": [
+        [
+          -5.5,
+          0.5
+        ],
+        [
+          -2.5,
+          0.5
+        ],
+        [
+          -2.5,
+          3.5
+        ],
+        [
+          0.0,
+          5.5
+        ],
+        [
+          5.5,
+          5.5
+        ],
+        [
+          5.5,
+          1.5
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          3
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          5
+        ]
+      ]
+    }
+  ]
+}
