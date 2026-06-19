@@ -18,7 +18,6 @@ from passages_tool.renderer.manifest import (
 )
 from passages_tool.converter.scene_builder import build_scene
 from passages_tool.renderer.viewpoint_renderer import ViewpointRenderer
-from passages_tool.renderer.transition_renderer import TransitionRenderer
 
 
 
@@ -161,56 +160,49 @@ def main() -> None:
                 print(f"  Failed to render: {key}", file=sys.stderr)
                 skipped_count += 1
 
-        # Re-save manifest with updated "rendered" statuses
+        # Re-save manifest with updated viewpoint "rendered" statuses
         save_manifest(manifest, save_path)
         print("Updated manifest with rendered statuses.")
 
-        # 5. Render transition animations
-        print("\nBaking transition animations...")
+        # 5. Bake midpoint traversal frames
+        print("\nBaking midpoint traversal frames...")
         eyepath_pl = None
         for pl in level.polylines.values():
             if pl.type == PolylineType.EYEPATH:
                 eyepath_pl = pl
                 break
 
-        edges = []
-        if eyepath_pl:
-            for v_from, v_to in eyepath_pl.edges:
-                i = min(v_from, v_to)
-                j = max(v_from, v_to)
-                if (i, j) not in edges:
-                    edges.append((i, j))
+        mid_rendered = 0
+        mid_skipped = 0
+        mid_failed = 0
 
-        trans_rendered = 0
-        trans_skipped = 0
-        trans_failed = 0
+        if eyepath_pl and eyepath_pl.edges:
+            for idx, (v_from, v_to) in enumerate(eyepath_pl.edges):
+                key = f"v{v_from:04d}_to_v{v_to:04d}"
+                dest_mid_png = output_dir / f"mid_{key}.png"
 
-        if edges:
-            trans_renderer = TransitionRenderer(renderer)
-            for idx, (i, j) in enumerate(edges):
-                fwd_gif = output_dir / f"trans_v{i:04d}_to_v{j:04d}_fwd.gif"
-                rev_gif = output_dir / f"trans_v{i:04d}_to_v{j:04d}_rev.gif"
-
-                needs_render = args.force or not fwd_gif.is_file() or not rev_gif.is_file()
+                needs_render = args.force or not dest_mid_png.is_file()
                 if not needs_render:
-                    trans_skipped += 2
+                    mid_skipped += 1
                     continue
 
-                print(f"[{idx+1}/{len(edges)}] Rendering transitions for edge v{i:04d} <-> v{j:04d}...")
-                fwd_ok, rev_ok = trans_renderer.render_transition(
-                    i, j, fwd_gif, rev_gif, width=width, height=height
+                print(f"[{idx+1}/{len(eyepath_pl.edges)}] Rendering midpoint frame {dest_mid_png.name}...")
+                ok = renderer.render_midpoint(
+                    v_from, v_to, dest_mid_png, width, height
                 )
-                if fwd_ok:
-                    trans_rendered += 1
+                if ok:
+                    mid_rendered += 1
                 else:
-                    trans_failed += 1
-                if rev_ok:
-                    trans_rendered += 1
-                else:
-                    trans_failed += 1
-            print(f"Transition baking completed. Rendered {trans_rendered} GIFs. Skipped: {trans_skipped}. Failed: {trans_failed}.")
+                    print(f"  Failed to render midpoint: {key}", file=sys.stderr)
+                    mid_failed += 1
+            print(f"Midpoint frame baking completed. Rendered {mid_rendered} images. Skipped: {mid_skipped}. Failed: {mid_failed}.")
         else:
-            print("No EyePath edges found. Skipping transition baking.")
+            print("No EyePath edges found. Skipping midpoint frame baking.")
+
+        # 6. Final manifest rebuild to capture viewpoints and midpoints
+        manifest = build_manifest(level, output_dir)
+        save_manifest(manifest, save_path)
+        print("Final manifest saved with all rendered assets.")
     finally:
         renderer.close()
 

@@ -8,7 +8,7 @@
 
 ## 1. System Overview
 
-Passages is a first-person corridor exploration minigame rendered using a **pre-computed viewpoint** strategy rather than a real-time engine.  Geometry is authored in the Passages Level Editor, converted to textured triangle strips (initially as `.egg` files), and rendered as single still images at each allowed viewpoint/direction combination.  Transitions between viewpoints are represented by a short blurred animation sequence.
+Passages is a first-person corridor exploration minigame rendered using a **pre-computed viewpoint** strategy rather than a real-time engine.  Geometry is authored in the Passages Level Editor, converted to textured triangle strips (initially as `.egg` files), and rendered as single still images at each allowed viewpoint/direction combination.  Transitions between viewpoints are represented by a midpoint frame dolly-zoom crossfade.
 
 The key insight is that **viewpoints are chosen by the designer**, not the player.  This allows the geometry to be cheap and the illusion of a varied environment to be maintained by ensuring that no viewpoint ever exposes the system's structural simplifications.
 
@@ -302,25 +302,22 @@ The converter (or a companion pre-computation tool) produces, for each `(eyepath
 
 - One still image per `(eyepath_vertex, facing_direction)` combination.
 - Rendered offline using Panda3D's offscreen buffer.
-- **Format during authoring: PNG** (lossless, preserves any residual transparency
-  for inspection and debugging).
-- **Format for shipping: JPEG** — after all renders are finalised and confirmed
-  fully opaque, a one-time conversion tool (`convert_to_jpeg.py`) composites
-  each PNG onto a black background, checks for any remaining transparent pixels
-  (warns if found — these indicate an unresolved geometry gap), and saves at
-  a configured quality level (default 92).
-- Stored in the level's `renders/` directory (PNG) or `shipping/` directory (JPEG).
+- **Format during authoring: PNG** (lossless, preserves any residual transparency for inspection and debugging).
+- **Format for shipping: Basis Universal / KTX2** (supercompressed, stays compressed in GPU VRAM), with a compressed **JPEG** version compiled as a fallback for devices without WebGL.
+  - The transcoder script (`convert_to_jpeg.py`) is updated to composite each PNG onto a black background and compile it into a KTX2 container using `basisu` (using ETC1S compression for backgrounds). 
+  - If the `basisu` CLI binary is not available on the compiler host, the script outputs a warning and skips KTX2 compilation, creating standard JPEG fallbacks only.
+- Stored in the level's `renders/` directory.
 
 ### 8.2 Viewpoint Transitions
 
 To represent movement between eye points:
 
-1. Render a short sequence of frames along a small linear path from the old viewpoint toward the new viewpoint (distance chosen so no Arch becomes edge-on during the traversal).
-2. Apply a motion blur or temporal blend to produce a brief animation (e.g. 0.3–0.5 seconds, 6–10 frames).
-3. Also render the same short sequence in reverse from the new viewpoint looking back, for returning along the same path.
-4. Store both sequences as short looping GIFs or sprite strips; play the appropriate one on player movement.
+1. Render a single static **Midpoint Traversal Frame** at $50\%$ distance along the undirected edge connecting the two eyepoints.
+2. The midpoint frame uses the same rendering style, headlight illumination, and fog settings as standard viewpoints.
+3. The filename is unordered and numerically sorted by vertex index: `mid_v[lower]_to_v[higher].ktx2` (with `.jpg` fallback).
+4. During movement, the game client executes a two-phase dolly-zoom crossfade: scaling and fading out the source image while scaling and fading in the midpoint image (0–150ms), followed by scaling/fading the midpoint image out while scaling/fading the destination image in (150–300ms).
 
-> **Constraint:** The traversal sub-path for transition frames must be kept short enough that no Arch's angular orientation to the camera deviates enough from face-on to expose the billboard illusion.
+> **Constraint:** The midpoint frame must satisfy the same visibility and perspective constraints as static viewpoints (e.g., fixed arches must not appear edge-on).
 
 ---
 

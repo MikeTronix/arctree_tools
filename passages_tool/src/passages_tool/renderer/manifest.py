@@ -55,8 +55,12 @@ def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str,
         # Determine if image exists
         image_name = f"render_{key}.png"
         rendered = False
+        midpoint_image_path = None
         if output_dir is not None:
             rendered = (Path(output_dir) / image_name).is_file()
+            mid_image_name = f"mid_{key}.png"
+            if (Path(output_dir) / mid_image_name).is_file():
+                midpoint_image_path = mid_image_name
 
         # Calculate visible anchors
         visible_anchors = {}
@@ -169,6 +173,7 @@ def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str,
 
         manifest[key] = {
             "image_path": image_name,
+            "midpoint_image_path": midpoint_image_path,
             "eyepoint_xyz": [p_from[0], p_from[1], eye_height],
             "facing_xyz": [p_to[0], p_to[1], eye_height],
             "rendered": rendered,
@@ -193,8 +198,8 @@ def load_manifest(path: Path) -> dict[str, Any]:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-# Regex to match output files like render_v0000_to_v0001.png or .jpg
-_IMAGE_PATTERN = re.compile(r"^render_v(\d{4})_to_v(\d{4})\.(png|jpg|jpeg)$")
+# Regex to match output files like render_v0000_to_v0001.png, .jpg, or mid_v0000_to_v0001.ktx2
+_IMAGE_PATTERN = re.compile(r"^(?:render|mid)_v(\d{4})_to_v(\d{4})\.(png|jpg|jpeg|ktx2)$")
 
 
 def find_stale_images(manifest: dict[str, Any], output_dir: Path) -> list[Path]:

@@ -13,6 +13,7 @@ def test_anchor_serialization():
     assert pl.z_offset == 0.0
     assert pl.fov_limit is None
     assert pl.sprite_count == 1
+    assert pl.tags == []
 
     # Modify fields
     pl.radius = 1.2
@@ -20,6 +21,7 @@ def test_anchor_serialization():
     pl.z_offset = 0.5
     pl.fov_limit = 35.0
     pl.sprite_count = 3
+    pl.tags = ["altar", "gate"]
 
     # Serialize
     d = pl.to_dict()
@@ -30,6 +32,7 @@ def test_anchor_serialization():
     assert d["z_offset"] == 0.5
     assert d["fov_limit"] == 35.0
     assert d["sprite_count"] == 3
+    assert d["tags"] == ["altar", "gate"]
 
     # Deserialize
     pl2 = Polyline.from_dict(d)
@@ -40,6 +43,7 @@ def test_anchor_serialization():
     assert pl2.z_offset == 0.5
     assert pl2.fov_limit == 35.0
     assert pl2.sprite_count == 3
+    assert pl2.tags == ["altar", "gate"]
 
 
 def test_anchor_visibility_and_occlusion():

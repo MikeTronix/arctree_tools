@@ -651,6 +651,17 @@ class PropertiesPanel:
             if fn:
                 fn(polyline.id, "sprite_count", max(1, new_sc))
 
+        # tags
+        imgui.set_next_item_width(-1)
+        tags_str = ", ".join(polyline.tags)
+        tags_changed, new_tags_str = imgui.input_text(
+            "Tags (comma separated)##anchor", tags_str)
+        if tags_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                tags_list = [t.strip() for t in new_tags_str.split(",") if t.strip()]
+                fn(polyline.id, "tags", tags_list)
+
     # ── Shared helpers ────────────────────────────────────────────────────────
 
     def _draw_vertex_list(self, imgui, polyline: Polyline) -> None:

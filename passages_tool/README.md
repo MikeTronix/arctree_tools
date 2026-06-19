@@ -13,8 +13,8 @@ A standalone Python + Panda3D application for designing, compiling, and baking 2
 - **In-Editor 3D Preview** — Render an offscreen perspective view directly from a selected EyePath vertex inside an ImGui preview panel.
 - **Asset Visibility Validator** — Toggle validation checks (via `V` key) to locate fixed arches that deviate near edge-on from the player's line of sight, highlighting them in bright red.
 - **Automatic 3D Scene Compiler** — Exports level geometry into structured `.egg` files, performing triangulation for floors (CCW winding) and ceilings (CW winding) to ensure correct face-culling.
-- **Baking & Transition Renderer** — Offscreen bakes static viewpoint frames (PNG) and traversal animations (GIF) with player headlight illumination and fog depth fading.
-- **JPEG Shipping Transcoder** — Pillow-based packaging script that compresses renders to JPEGs and alerts on any transparency anomalies before deployment.
+- **Baking & Midpoint Renderer** — Offscreen bakes static viewpoint frames (PNG) and midpoint traversal frames (PNG) with player headlight illumination and fog depth fading.
+- **Shipping Transcoder** — Pillow and Basis Universal-based packaging script that compiles renders to `.ktx2` formats (with JPEG fallbacks) and alerts on any transparency anomalies before deployment.
 - **Undo / Redo** — Robust history snapshot stack (`Ctrl+Z` / `Ctrl+Y`).
 
 ---
@@ -35,9 +35,9 @@ passages_tool/
 │   │   └── egg_writer.py             EggData writer context wrapper
 │   ├── renderer/          Offscreen Viewpoint Baker & Packager
 │   │   ├── viewpoint_renderer.py     Panda3D offscreen perspective bakes
-│   │   ├── transition_renderer.py    Linear traversal path calculator & GIF generator
+│   │   ├── transition_renderer.py    Linear traversal path calculator & Midpoint frame generator
 │   │   ├── manifest.py               Render manifest manager
-│   │   └── convert_to_jpeg.py        Game deployment JPEG compression
+│   │   └── convert_to_jpeg.py        Game deployment KTX2/JPEG transcoder
 │   ├── editor/            Core Data Model & Logic
 │   │   ├── level.py       Level structure, migration, and CRUD handlers
 │   │   ├── polyline.py    Scene graph representation of drawable lines
@@ -87,13 +87,13 @@ python -m passages_tool.converter json/onion.passages.json scene_out/ --textures
 ```
 
 ### Running the Rendering Baker CLI
-To bake viewpoints and transitions:
+To bake viewpoints and midpoint frames:
 ```bash
 python -m passages_tool.renderer json/onion.passages.json scene_out/ renders_out/ --textures assets/sample_textures/ --force
 ```
 
 ### Running the Shipping Transcoder CLI
-To package PNGs into optimized game-ready JPEGs:
+To package PNGs into optimized game-ready KTX2 and JPEG fallbacks:
 ```bash
 python -m passages_tool.renderer.convert_to_jpeg renders_out/ shipping_out/
 ```

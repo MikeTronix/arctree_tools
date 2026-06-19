@@ -199,6 +199,7 @@ class Polyline:
     max_distance:   float = 10.0
     fov_limit:      Optional[float] = None
     sprite_count:   int = 1
+    tags:           list[str] = field(default_factory=list)
 
     # ── Convenience properties ────────────────────────────────────────────────
 
@@ -282,6 +283,7 @@ class Polyline:
             d["max_distance"]   = self.max_distance
             d["fov_limit"]      = self.fov_limit
             d["sprite_count"]   = self.sprite_count
+            d["tags"]           = list(self.tags)
         return d
 
     @staticmethod
@@ -342,6 +344,7 @@ class Polyline:
                 max_distance   = float(pd.get("max_distance", 10.0)),
                 fov_limit      = pd.get("fov_limit"),
                 sprite_count   = int(pd.get("sprite_count", 1)),
+                tags           = list(pd.get("tags", [])),
             )
             if pl.fov_limit is not None:
                 pl.fov_limit = float(pl.fov_limit)

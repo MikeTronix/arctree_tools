@@ -26,8 +26,8 @@ graph TD
 
 When a level is fully built and baked, it yields a unified directory structure containing three main elements:
 1. **The Level Manifest (`manifest.json`)**: Contains viewpoint coordinate details and metadata.
-2. **Pre-rendered Viewpoint Backgrounds (`render_vXXXX_to_vYYYY.jpg`)**: High-quality compressed JPEG backdrops.
-3. **Traversal Transitions (`trans_vXXXX_to_vYYYY_fwd.gif`)**: Traversal animation frames shown during forward movement.
+2. **Pre-rendered Viewpoint Backgrounds (`render_vXXXX_to_vYYYY.jpg` or `.ktx2`)**: High-quality backdrops.
+3. **Midpoint Traversal Frames (`mid_vXXXX_to_vYYYY.jpg` or `.ktx2`)**: Static midpoint frames used for tween transitions.
 4. **The Map Source File (`[level_name].passages.json`)**: Raw geometry data used for pathfinding, collision detection, and spatial queries.
 
 ### Directory Layout
@@ -37,15 +37,67 @@ game_assets/
     └── level_01/
         ├── manifest.json
         ├── level_01.passages.json
-        ├── renders/
-        │   ├── render_v0000_to_v0001.jpg
-        │   ├── render_v0001_to_v0002.jpg
-        │   └── ...
-        └── transitions/
-            ├── trans_v0000_to_v0001_fwd.gif
-            ├── trans_v0000_to_v0001_rev.gif
+        └── renders/
+            ├── render_v0000_to_v0001.ktx2
+            ├── render_v0000_to_v0001.jpg
+            ├── mid_v0000_to_v0001.ktx2
+            ├── mid_v0000_to_v0001.jpg
             └── ...
 ```
+
+### 2.1. Texture Format & VRAM Compression (Basis Universal / KTX2)
+
+**Requirement:** Static images — **viewpoint backgrounds and billboard sprites** — must ship
+as **GPU-supercompressed textures** (Basis Universal, delivered in a `.ktx2` container)
+rather than as decoded JPEG/PNG. The transcoder produces a hardware-native compressed format
+(BC7 / BC1 / ASTC / ETC2, selected per device) that **stays compressed in VRAM** while it
+waits to be sampled to the display, instead of expanding to full RGBA8.
+
+**Why this matters here.** A `1280×720` background decoded to RGBA8 occupies
+`1280 × 720 × 4 ≈ 3.5 MB` of VRAM. A single level's eight viewpoints is ~28 MB — already at
+the minigame host's **32 MB texture budget** with nothing left for sprites or for preloading
+the *next* level's neighbors (see §5). The same images as Basis cost roughly:
+
+| Format in VRAM | Bits/px | Per 1280×720 bg | 8 viewpoints |
+|---|---|---|---|
+| RGBA8 (JPEG/PNG decoded) | 32 | ~3.5 MB | ~28 MB |
+| BC7 / UASTC target | 8 | ~0.9 MB | ~7 MB |
+| BC1 / ETC1S target | 4 | ~0.45 MB | ~3.5 MB |
+
+That 4–8× reduction is what makes multi-level preloading and on-top sprites fit the budget.
+
+**Scope — what this does and does not cover:**
+
+* ✅ **Backgrounds** (`render_*`) — yes. Encode from the lossless PNG masters, **not** the
+  shipped JPEGs, to avoid lossy-on-lossy. Smooth fog gradients are prone to block-compression
+  banding; prefer **UASTC → BC7** where quality matters, **ETC1S → BC1** where VRAM/disk size
+  dominates and mild banding is acceptable.
+* ✅ **Sprites** (characters / items / monsters / levers) — yes, including alpha. Sprites
+  carry transparency (the level format's arch sprites use `alpha_test`), so prefer **UASTC**,
+  which preserves alpha and crisp edges far better than ETC1S. Pad sprite dimensions to a
+  multiple of 4 (block size).
+* ✅ **Midpoint transition frames** (`mid_*`) — yes. Encoded from the lossless PNG masters. Midpoint frames have no transparency, so they use the same parameters as backgrounds (**UASTC** or **ETC1S**). This replaces the retired GIF-based transition model entirely, saving massive amounts of VRAM.
+
+**Runtime prerequisites (must hold for this to work):**
+
+1. **WebGL renderer.** Compressed textures are a WebGL-only feature. The host game is
+   created with `Phaser.AUTO` (`client/src/phaser/PhaserRoot.tsx`), which selects WebGL on
+   any capable device — so this holds in practice. **On the Canvas2D fallback path
+   (no WebGL), Basis cannot be used**; ship a fallback chain (Phaser's multi-format
+   `load.texture()` accepts an `{ IMG: 'render_xxxx.jpg' }` fallback alongside the `.ktx2`).
+2. **Host loader support.** The current `MinigameHost.loadImage` →
+   `ScopedLoader.loadImage` path uses `scene.load.image()` + the `filecomplete-image-*`
+   event, which does **not** transcode `.ktx2`. A new host method
+   (e.g. `loadCompressedTexture(key, { ktx2, fallbackImg })`) wrapping Phaser's compressed-
+   texture loader is required before Passages can consume these assets. Phaser has supported
+   Basis/KTX2 compressed textures since 3.60; verify the exact 4.1 loader API when
+   implementing.
+
+**Tool side.** The shipping transcoder (`renderer/convert_to_jpeg.py`) gains a Basis/KTX2
+export path (e.g. `toktx`/`libktx` or the `basis_universal` encoder) and the manifest's
+`image_path` points at the `.ktx2` files (with the `.jpg` retained only as the optional
+WebGL-absent fallback). The compiler script gracefully skips KTX2 compression if the
+`basisu` binary is not found on the developer's system, falling back to standard JPEGs.
 
 ---
 
@@ -57,7 +109,8 @@ The manifest maps directed traversal edges (gaze directions) in the level to ima
 ```json
 {
   "v0000_to_v0001": {
-    "image_path": "render_v0000_to_v0001.jpg",
+    "image_path": "render_v0000_to_v0001.ktx2",
+    "midpoint_image_path": "mid_v0000_to_v0001.ktx2",
     "eyepoint_xyz": [0.0, 0.0, 1.2],
     "facing_xyz": [0.0, 4.0, 1.2],
     "rendered": true,
@@ -73,7 +126,8 @@ The manifest maps directed traversal edges (gaze directions) in the level to ima
     }
   },
   "v0001_to_v0002": {
-    "image_path": "render_v0001_to_v0002.jpg",
+    "image_path": "render_v0001_to_v0002.ktx2",
+    "midpoint_image_path": null,
     "eyepoint_xyz": [0.0, 4.0, 1.2],
     "facing_xyz": [3.0, 4.0, 1.2],
     "rendered": true,
@@ -94,6 +148,7 @@ The manifest maps directed traversal edges (gaze directions) in the level to ima
 
 #### Field Details
 * **`image_path`** (`string`): The filename of the viewpoint background image inside the renders directory.
+* **`midpoint_image_path`** (`string | null`): The filename of the midpoint transition image, or `null` if no transition frame exists.
 * **`eyepoint_xyz`** (`[float, float, float]`): The 3D coordinate of the camera (Z-up system, where $Z$ is height).
 * **`facing_xyz`** (`[float, float, float]`): The 3D target coordinate the camera is looking toward.
 * **`flicker`** (`object | null`): Optional lighting behavior metadata. If non-null, the game client should dynamically modulate the screen exposure/brightness over time to simulate a flickering torch or broken light source.
@@ -189,10 +244,35 @@ $$\text{State} = (V_{\text{current}}, V_{\text{facing}})$$
   3. If $E_{\text{forward}}$ contains candidates, select $V_{\text{next}}$ that minimizes the angle deviation from the current heading:
      $$\vec{u} = V_{\text{facing}} - V_{\text{current}}, \quad \vec{v} = V_{\text{next}} - V_{\text{facing}}$$
      $$\theta = \arccos\left(\frac{\vec{u} \cdot \vec{v}}{\|\vec{u}\| \|\vec{v}\|}\right)$$
-  4. Play transition GIF `trans_v[V_current]_to_v[V_facing]_fwd.gif` on the screen.
+  4. Play the transition animation for the traversed edge (see §4.2 for which file and direction).
   5. Update the player state to:
      $$\text{State}_{\text{new}} = (V_{\text{facing}}, V_{\text{next}})$$
      Once the transition completes, swap the screen background to the static image `render_v[V_facing]_to_v[V_next].jpg`.
+
+### 4.2. Mid-Motion Transition Resolution (Midpoint Crossfade Tweening)
+
+Transition GIFs are retired in favor of **single static midpoint images** representing the level layout appearance exactly $50\%$ along the path between two vertices. This reduces VRAM overhead by over $99\%$, cuts rendering assets in half, and eliminates the need for direction-specific (`_fwd` vs. `_rev`) transition assets.
+
+#### Midpoint Asset Resolution
+For any undirected edge connecting $V_a$ and $V_b$, a single midpoint image is generated. By convention, the filename is keyed using the numerically sorted order of the vertex indices:
+* `mid_v[lower]_to_v[higher].ktx2` (primary)
+* `mid_v[lower]_to_v[higher].jpg` (fallback)
+
+Example: For travel between `v0000` and `v0001` in either direction, the client resolves the midpoint frame as `mid_v0000_to_v0001`.
+
+#### Dolly-Zoom Crossfade Tweening Algorithm
+To represent motion from a source viewpoint to a destination viewpoint:
+1. **Prerequisites check:** If `midpoint_image_path` in the manifest is `null`, or if compressed texture features are disabled and no fallback `.jpg` exists, degrade gracefully to a simple **fade-out / fade-in** of the main viewpoint images (duration: $300\text{ ms}$).
+2. **Setup:** Instantiate the source image (`A`), the midpoint image (`B`), and the destination image (`C`) layered in WebGL. Ensure the incoming layer renders behind the current layer.
+3. **Phase 1 (Dolly to Midpoint):**
+   * **Scale / Alpha Tween:** Over $150\text{ ms}$, scale Frame `A` up from $1.0 \rightarrow 1.5$ and fade its opacity from $1.0 \rightarrow 0.0$.
+   * Simultaneously, scale Frame `B` up from $0.6 \rightarrow 1.0$ and fade its opacity from $0.0 \rightarrow 1.0$.
+4. **Phase 2 (Dolly to Destination):**
+   * **Scale / Alpha Tween:** Over another $150\text{ ms}$, scale Frame `B` up from $1.0 \rightarrow 1.5$ and fade its opacity from $1.0 \rightarrow 0.0$.
+   * Simultaneously, scale Frame `C` up from $0.6 \rightarrow 1.0$ and fade its opacity from $0.0 \rightarrow 1.0$.
+5. **Completion:** Snap the scene camera to static viewpoint `C` at scale $1.0$ and unload/hide the transition layers.
+
+This two-phase crossfade creates a smooth visual illusion of depth traversal over approximately $300\text{ ms}$ using only one additional static image.
 
 ---
 
