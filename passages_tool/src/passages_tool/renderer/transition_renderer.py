@@ -14,6 +14,7 @@ from PIL import Image
 from panda3d.core import Filename, PNMImage, PerspectiveLens, PointLight, LColor
 
 from passages_tool import config
+from passages_tool.editor.arch_utils import arch_view_angle
 from passages_tool.editor.level import Level, PolylineType
 
 
@@ -24,40 +25,16 @@ def edge_on_check(
     threshold_deg: float = 60.0,
 ) -> bool:
     """
-    Returns True if the angle between the arch normal and the view vector
-    diverges from face-on (0 or 180 degrees) by more than threshold_deg.
+    Returns True if the view diverges from face-on by more than threshold_deg
+    (``ArchViewAngle.from_normal_deg``: 0 = face-on, 90 = edge-on).
     Billboard arches are always immune (returns False).
+    ``camera_pos`` is unused (kept for call-site compatibility).
     """
-    if arch.orientation == "billboard":
+    del camera_pos
+    ang = arch_view_angle(arch.orientation, view_vector)
+    if ang is None:
         return False
-
-    try:
-        theta_deg = float(arch.orientation)
-    except (ValueError, TypeError):
-        return False
-
-    # Arch normal points along orientation (facing angle)
-    theta_rad = math.radians(theta_deg)
-    nx = math.cos(theta_rad)
-    ny = math.sin(theta_rad)
-
-    # Normalize view vector
-    vx, vy = view_vector
-    v_len = math.hypot(vx, vy)
-    if v_len == 0.0:
-        return False
-    vx /= v_len
-    vy /= v_len
-
-    # Dot product
-    dot_val = vx * nx + vy * ny
-    abs_dot = min(1.0, max(-1.0, abs(dot_val)))
-    angle_rad = math.acos(abs_dot)
-    angle_deg = math.degrees(angle_rad)
-
-    # Divergence from face-on (0 degrees) is the angle to the normal/anti-normal
-    # If angle_deg > threshold_deg, the view direction is too close to parallel to the arch plane
-    return angle_deg > threshold_deg
+    return ang.from_normal_deg > threshold_deg
 
 
 def compute_transition_path(
@@ -72,12 +49,8 @@ def compute_transition_path(
     Distance is capped to keep all fixed arches within range comfortably face-on.
     Returns a list of (x, y, heading_deg) tuples.
     """
-    # Find EyePath polyline
-    eyepath_pl = None
-    for pl in level.polylines.values():
-        if pl.type == PolylineType.EYEPATH:
-            eyepath_pl = pl
-            break
+    paths = level.eyepaths()
+    eyepath_pl = paths[0] if paths else None
 
     if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
         return []

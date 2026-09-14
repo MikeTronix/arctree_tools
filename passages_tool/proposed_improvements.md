@@ -42,6 +42,7 @@ Do not re-derive these; extend them.
 | `interval_edge_indices(pl, iv)` | `editor/level.py` | Edges covered by one texture interval, including closing edge when `to_vertex == n-1`. Wall builder and `validate_textures` share this. |
 | `_texture_intervals_overlap(a, b)` | `editor/level.py` | Half-open `[from, to)` overlap. `add_texture_interval` no-ops on overlap; `validate_textures` still warns for intervals already on disk. |
 | `Level.eyepaths()` | `editor/level.py` | All EyePath polylines. Bake/preview/validator still use **the first**. `validate_structure` warns if `len > 1`. `Level.walls()` / `Level.anchors()` are not added yet. |
+| `arch_view_angle(orientation, view)` | `editor/arch_utils.py` | Shared face-on/edge-on math → `ArchViewAngle` or `None`. Validator: `to_plane_deg`; `edge_on_check`: `from_normal_deg`. |
 | `Level.sync_derived_fov_h()` | `editor/level.py` | Updates `meta.fov_h` without touching `dirty`. |
 | `History.redo(current_snapshot)` | `editor/history.py` | Pushes current onto `_undos` before popping redo (undo→redo→undo no longer skips). |
 | `validate_structure(level)` | `editor/validator.py` | Extra-EyePath warning. Called from editor Validate together with textures + arch visibility. |
@@ -178,9 +179,11 @@ Each warning with `arch_id` has a Select button that frames the polyline. `Valid
 
 Four component eggs share one build. Combined `scene.egg` is still a second build when `write_combined=True` (converter CLI). Preview/baker skip it (`load_scene` never read `scene.egg`). Remaining: a combined file without a second tessellation, or drop `scene.egg`.
 
-### 4.3 Midpoint bake ignores the “safe travel” path — **open** (design fork)
+### 4.3 Shared `arch_view_angle()` / midpoint camera — **partial**
 
-`render_midpoint` stays at geometric 50%. `compute_transition_path` / `edge_on_check` remain unused by the baker (tests still cover them). Validator uses `asin(|dot|)` (angle to plane); `edge_on_check` uses `acos(|dot|)` (angle from face-on). Do **not** switch bake cameras without deciding that existing mid frames may change. If implemented later: one `arch_view_angle()` shared by validator and the cap.
+**Done:** `arch_view_angle()` in `editor/arch_utils.py` returns `ArchViewAngle(from_normal_deg, to_plane_deg)` (complements, always sum to 90°). `validate_arch_visibility` uses `to_plane_deg`; `edge_on_check` uses `from_normal_deg`. Billboard / bad orientation → `None`.
+
+**Still open (design fork, not implemented):** bake midpoints stay at geometric 50% of the edge. Cap-travel would instead walk along the edge and **stop short** of any camera position where a fixed arch is edge-on, then bake the last *safe* point (often not 50%, sometimes 0%). That changes every existing `mid_*.png`. Do not switch without an explicit choice.
 
 ### 4.4 `find_basisu` wrong `bin/` — **done** (transcoder chain leftover)
 
@@ -305,7 +308,7 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 
 P0, core P1, and the docs pass are done. Next, if continuing this list:
 
-1. **Decide 4.3** — keep geometric midpoints (current) or cap travel with a shared `arch_view_angle()`. Content-visible.
+1. **Decide 4.3 bake camera** — keep geometric midpoints (current) or cap travel using `arch_view_angle()`. Shared math is done; switching cameras is content-visible.
 2. **Decide 4.8** — keep largest-loop+holes (documented) or per-room floors. Content-visible.
 3. **Small leftovers** — typed Validate issues (3.13), `from_dict` overlap error (4.7), chain KTX2 in `bake.bat` (4.4), `grid.cell_size` (3.3), `walls()`/`anchors()` (5.3).
 4. **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles.

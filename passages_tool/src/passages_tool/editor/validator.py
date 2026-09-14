@@ -9,6 +9,7 @@ import math
 from dataclasses import dataclass
 from typing import Optional
 
+from passages_tool.editor.arch_utils import arch_view_angle
 from passages_tool.editor.level import (
     Level,
     PolylineType,
@@ -173,22 +174,12 @@ def validate_arch_visibility(
             if dist > fog_end:
                 continue
 
-            try:
-                theta_deg = float(arch.orientation)
-            except (ValueError, TypeError):
+            ang = arch_view_angle(arch.orientation, (vx, vy))
+            if ang is None:
                 continue
 
-            # Arch normal vector points along orientation (facing angle)
-            theta_rad = math.radians(theta_deg)
-            nx = math.cos(theta_rad)
-            ny = math.sin(theta_rad)
-
-            # Angle between view vector and arch plane (90 = face-on, 0 = edge-on)
-            dot_val = vx * nx + vy * ny
-            abs_dot = min(1.0, max(-1.0, abs(dot_val)))
-            angle_rad = math.asin(abs_dot)
-            angle_deg = math.degrees(angle_rad)
-
+            # to_plane_deg: 90 = face-on, 0 = edge-on
+            angle_deg = ang.to_plane_deg
             if angle_deg < threshold_deg:
                 msg = (
                     f"Arch {arch.id[:8]}... is edge-on (view angle {angle_deg:.1f}° < {threshold_deg}°) "

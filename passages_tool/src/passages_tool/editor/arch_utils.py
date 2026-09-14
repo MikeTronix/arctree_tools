@@ -1,6 +1,55 @@
 import math
-from typing import Optional, Tuple
+from typing import NamedTuple, Optional, Tuple, Union
 from passages_tool.editor.level import Level, PolylineType
+
+
+class ArchViewAngle(NamedTuple):
+    """How a view direction meets a fixed-orientation arch.
+
+    ``from_normal_deg``: 0 = looking at the face, 90 = looking along the plane
+    (edge-on). This is ``acos(|view · normal|)``.
+
+    ``to_plane_deg``: 90 = face-on, 0 = edge-on. Always ``90 - from_normal_deg``
+    (``asin(|view · normal|)``).
+
+    Billboard / unparseable orientation / zero view vector: callers get ``None``
+    from ``arch_view_angle`` instead of this tuple.
+    """
+
+    from_normal_deg: float
+    to_plane_deg: float
+
+
+def arch_view_angle(
+    orientation: Union[str, float],
+    view_vector: Tuple[float, float],
+) -> Optional[ArchViewAngle]:
+    """Angle between a view direction and a fixed arch.
+
+    Arch *normal* is ``(cos θ, sin θ)`` from ``orientation`` in degrees.
+    Returns ``None`` for billboards, non-numeric orientation, or a zero view
+    vector (those are never edge-on-checked).
+    """
+    if orientation == "billboard":
+        return None
+    try:
+        theta_deg = float(orientation)
+    except (ValueError, TypeError):
+        return None
+
+    vx, vy = view_vector
+    v_len = math.hypot(vx, vy)
+    if v_len < 1e-12:
+        return None
+    vx /= v_len
+    vy /= v_len
+
+    nx = math.cos(math.radians(theta_deg))
+    ny = math.sin(math.radians(theta_deg))
+    abs_dot = min(1.0, max(-1.0, abs(vx * nx + vy * ny)))
+    from_normal = math.degrees(math.acos(abs_dot))
+    to_plane = math.degrees(math.asin(abs_dot))
+    return ArchViewAngle(from_normal_deg=from_normal, to_plane_deg=to_plane)
 
 def nearest_wall_edge(
     arch_pos: Tuple[float, float],

@@ -2,10 +2,44 @@ import math
 import pytest
 from passages_tool.editor.level import Level, Polyline
 from passages_tool.editor.arch_utils import (
+    arch_view_angle,
     nearest_wall_edge,
     is_tangent_ambiguous,
     arch_perpendicular_angle,
 )
+
+def test_arch_view_angle_billboard_and_degenerate():
+    assert arch_view_angle("billboard", (1.0, 0.0)) is None
+    assert arch_view_angle("nope", (1.0, 0.0)) is None
+    assert arch_view_angle(0.0, (0.0, 0.0)) is None
+
+
+def test_arch_view_angle_face_on_and_edge_on():
+    # Orientation 0° → normal (1, 0)
+    face = arch_view_angle(0.0, (1.0, 0.0))
+    assert face is not None
+    assert face.from_normal_deg == pytest.approx(0.0)
+    assert face.to_plane_deg == pytest.approx(90.0)
+
+    edge = arch_view_angle(0.0, (0.0, 1.0))
+    assert edge is not None
+    assert edge.from_normal_deg == pytest.approx(90.0)
+    assert edge.to_plane_deg == pytest.approx(0.0)
+
+    # Anti-parallel view is still face-on (|dot| = 1)
+    back = arch_view_angle(0.0, (-1.0, 0.0))
+    assert back is not None
+    assert back.from_normal_deg == pytest.approx(0.0)
+
+
+def test_arch_view_angle_complements():
+    """from_normal + to_plane is always 90° (the two old APIs)."""
+    ang = arch_view_angle(0.0, (1.0, 1.0))
+    assert ang is not None
+    assert ang.from_normal_deg == pytest.approx(45.0)
+    assert ang.to_plane_deg == pytest.approx(45.0)
+    assert ang.from_normal_deg + ang.to_plane_deg == pytest.approx(90.0)
+
 
 def test_arch_perpendicular_angle():
     assert arch_perpendicular_angle(0.0) == 0.0
