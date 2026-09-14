@@ -59,9 +59,13 @@ class TextureManager:
         if not self._base_dir.is_dir():
             return
 
-        for path in sorted(self._base_dir.iterdir()):
-            if path.suffix.lower() in _SUPPORTED_EXTS:
-                self._names.append(path.name)
+        for path in sorted(self._base_dir.rglob("*")):
+            if not path.is_file() or path.suffix.lower() not in _SUPPORTED_EXTS:
+                continue
+            if any(part.startswith(".") for part in path.relative_to(self._base_dir).parts):
+                continue
+            rel = path.relative_to(self._base_dir).as_posix()
+            self._names.append(rel)
 
     @property
     def texture_names(self) -> list[str]:

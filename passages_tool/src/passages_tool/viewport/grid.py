@@ -30,13 +30,21 @@ class BackgroundGrid:
         self._root      = render_root
         self._node_path: NodePath | None = None
 
-    def rebuild(self, film_w: float, film_h: float, cam_x: float, cam_z: float) -> None:
+    def rebuild(
+        self,
+        film_w: float,
+        film_h: float,
+        cam_x: float,
+        cam_z: float,
+        cell: float | None = None,
+    ) -> None:
         """
         Rebuild grid lines to cover the visible world region.
 
         Args:
             film_w / film_h: visible world-space dimensions.
             cam_x / cam_z:   camera world position (centre of view).
+            cell:            minor-line spacing (defaults to GRID_CELL).
         """
         if self._node_path:
             self._node_path.removeNode()
@@ -54,8 +62,12 @@ class BackgroundGrid:
         z_bottom = cam_z - half_h
         z_top    = cam_z + half_h
 
-        # Snap grid start to cell boundary.
-        cell = GRID_CELL
+        # Snap grid start to cell boundary. Cap density so tiny snap sizes
+        # do not emit thousands of LineSegs.
+        cell = float(cell) if cell and cell > 0.0 else GRID_CELL
+        span = max(x_right - x_left, z_top - z_bottom)
+        while span / cell > 240.0:
+            cell *= 2.0
         x_start = math.floor(x_left  / cell) * cell
         z_start = math.floor(z_bottom / cell) * cell
 

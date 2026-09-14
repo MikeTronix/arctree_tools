@@ -33,6 +33,8 @@ htmlcov/
 *.passages.json.bak
 logs/
 imgui.ini
+editor_state.json
+.venv_uv/
 
 # Level JSON files (ignore specific/intermediate level files, keep universal test levels)
 json/*.passages.json

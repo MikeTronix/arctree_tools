@@ -12,7 +12,17 @@ from unittest.mock import patch, MagicMock
 
 from PIL import Image
 
-from passages_tool.renderer.convert_to_jpeg import convert_renders
+from passages_tool.renderer.convert_to_jpeg import convert_renders, local_basisu_binary
+
+
+def test_local_basisu_binary_is_under_tool_root():
+    from passages_tool.renderer import convert_to_jpeg as mod
+    tool_root = Path(mod.__file__).resolve().parents[3]
+    assert tool_root.name == "passages_tool"
+    expected = tool_root / "bin" / ("basisu.exe" if __import__("os").name == "nt" else "basisu")
+    found = local_basisu_binary()
+    if found is not None:
+        assert Path(found) == expected
 
 
 def test_convert_opaque_png_fallback(tmp_path):

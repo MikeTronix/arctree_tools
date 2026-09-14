@@ -8,7 +8,11 @@ from __future__ import annotations
 import pytest
 
 from passages_tool.editor.level import Level, Polyline, TextureInterval
-from passages_tool.editor.validator import validate_arch_visibility, validate_textures
+from passages_tool.editor.validator import (
+    validate_arch_visibility,
+    validate_structure,
+    validate_textures,
+)
 
 
 def test_validator_billboard_arches():
@@ -101,6 +105,19 @@ def test_validator_out_of_range_arch():
 
     warnings = validate_arch_visibility(level, threshold_deg=30.0)
     assert len(warnings) == 0
+
+
+def test_validate_structure_multiple_eyepaths():
+    level = Level()
+    a = Polyline.make_eyepath()
+    b = Polyline.make_eyepath()
+    a.vertices = [(0.0, 0.0), (1.0, 0.0)]
+    b.vertices = [(2.0, 0.0), (3.0, 0.0)]
+    level.add_polyline(a)
+    level.add_polyline(b)
+    warnings = validate_structure(level)
+    assert len(warnings) == 1
+    assert "2 EyePath" in warnings[0].message
 
 
 def test_validate_textures_closed_wall_full_interval():

@@ -120,6 +120,11 @@ def wall_edge_index_pairs(pl: "Polyline") -> list[tuple[int, int]]:
     return pairs
 
 
+def _texture_intervals_overlap(a: TextureInterval, b: TextureInterval) -> bool:
+    """True if two wall intervals cover a shared edge ([from, to) in vertex space)."""
+    return a.from_vertex < b.to_vertex and b.from_vertex < a.to_vertex
+
+
 def interval_edge_indices(pl: "Polyline", iv: TextureInterval) -> list[int]:
     """Edge indices covered by a texture interval.
 
@@ -448,6 +453,9 @@ class Level:
     def get_polyline(self, polyline_id: str) -> Optional[Polyline]:
         return self.polylines.get(polyline_id)
 
+    def eyepaths(self) -> list[Polyline]:
+        return [pl for pl in self.polylines.values() if pl.type == PolylineType.EYEPATH]
+
     def add_vertex(self, polyline_id: str, x: float, z: float) -> None:
         pl = self.polylines.get(polyline_id)
         if pl is not None:
@@ -516,12 +524,26 @@ class Level:
             if iv.to_vertex > after_idx:
                 iv.to_vertex += 1
 
-        # Shift eyepath edge endpoints past the split point.
-        pl.edges = [
+        # Shift eyepath edge endpoints past the split point, then split any
+        # edge that spanned the insertion (after_idx → after_idx+1 becomes
+        # after_idx → new and new → after_idx+2, plus the reverse if present).
+        new_idx = after_idx + 1
+        shifted: list[tuple[int, int]] = [
             (vi + 1 if vi > after_idx else vi,
              vj + 1 if vj > after_idx else vj)
             for (vi, vj) in pl.edges
         ]
+        split: list[tuple[int, int]] = []
+        for vi, vj in shifted:
+            if vi == after_idx and vj == new_idx + 1:
+                split.append((after_idx, new_idx))
+                split.append((new_idx, new_idx + 1))
+            elif vj == after_idx and vi == new_idx + 1:
+                split.append((new_idx + 1, new_idx))
+                split.append((new_idx, after_idx))
+            else:
+                split.append((vi, vj))
+        pl.edges = split
 
         self.dirty = True
 
@@ -558,6 +580,9 @@ class Level:
         if pl is not None and pl.type == PolylineType.WALL:
             if interval.from_vertex >= interval.to_vertex:
                 return          # zero- or negative-length interval is a no-op
+            for other in pl.texture_intervals:
+                if _texture_intervals_overlap(interval, other):
+                    return      # overlapping intervals would z-fight
             pl.texture_intervals.append(interval)
             pl.texture_intervals.sort(key=lambda iv: iv.from_vertex)
             self.dirty = True

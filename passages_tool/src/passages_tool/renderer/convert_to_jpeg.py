@@ -32,6 +32,13 @@ def _manifest_edge_entries(manifest_data: dict) -> list[dict]:
     ]
 
 
+def local_basisu_binary() -> Path | None:
+    """`passages_tool/bin/basisu[.exe]` next to the project (not src/bin)."""
+    tool_root = Path(__file__).resolve().parents[3]
+    binary = tool_root / "bin" / ("basisu.exe" if os.name == "nt" else "basisu")
+    return binary if binary.is_file() else None
+
+
 def find_basisu(custom_path: str | None = None) -> str | None:
     """Finds the basisu binary, looking at custom_path, local bin directory, and system PATH."""
     if custom_path:
@@ -43,9 +50,8 @@ def find_basisu(custom_path: str | None = None) -> str | None:
             if binary.is_file():
                 return str(binary)
 
-    # Check local bin subdirectory (../../bin/basisu)
-    local_bin = Path(__file__).parent.parent.parent / "bin" / ("basisu.exe" if os.name == "nt" else "basisu")
-    if local_bin.is_file():
+    local_bin = local_basisu_binary()
+    if local_bin is not None:
         return str(local_bin)
 
     # Fallback to system PATH

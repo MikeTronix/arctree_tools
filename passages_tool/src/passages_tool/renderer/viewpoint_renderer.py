@@ -11,7 +11,12 @@ from typing import Any, Optional
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Filename, PNMImage, PerspectiveLens, PointLight, LColor
 
-from passages_tool.config import derived_fov_h
+from passages_tool.config import (
+    CAMERA_FAR,
+    CAMERA_NEAR,
+    HEADLIGHT_ATTENUATION,
+    derived_fov_h,
+)
 from passages_tool.converter.scene_builder import load_scene
 from passages_tool.editor.level import Level, PolylineType
 
@@ -85,13 +90,13 @@ class ViewpointRenderer:
         fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
         lens.set_aspect_ratio(aspect_ratio)
         lens.set_fov(fov_h_calc, fov_v)
-        lens.set_near_far(0.1, 100.0)
+        lens.set_near_far(CAMERA_NEAR, CAMERA_FAR)
         cam.node().set_lens(lens)
 
         # Add camera headlight (PointLight) so the scene is illuminated from the viewer's viewpoint
         plight = PointLight("camera_headlight")
         plight.set_color(LColor(1.0, 1.0, 1.0, 1.0))
-        plight.set_attenuation((0.0, 0.0, 0.03))
+        plight.set_attenuation(HEADLIGHT_ATTENUATION)
         pl_path = cam.attach_new_node(plight)
         pl_path.set_pos(0, 0, 0)
         self.scene_root.set_light(pl_path)
@@ -122,7 +127,12 @@ class ViewpointRenderer:
         width: Optional[int] = None,
         height: Optional[int] = None,
     ) -> bool:
-        """Render a midpoint frame along the directed edge to a PNG file."""
+        """Render a midpoint frame along the directed edge to a PNG file.
+
+        Uses the geometric 50% point of the edge (not the edge-on-capped
+        `compute_transition_path` helper). That helper remains for validation
+        experiments; changing bake camera placement is a content-visible fork.
+        """
         # Find EyePath vertices
         eyepath_pl = None
         for pl in self.level.polylines.values():
@@ -164,13 +174,13 @@ class ViewpointRenderer:
         fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
         lens.set_aspect_ratio(aspect_ratio)
         lens.set_fov(fov_h_calc, fov_v)
-        lens.set_near_far(0.1, 100.0)
+        lens.set_near_far(CAMERA_NEAR, CAMERA_FAR)
         cam.node().set_lens(lens)
 
         # Add camera headlight (PointLight) so the scene is illuminated from the viewer's viewpoint
         plight = PointLight("camera_headlight")
         plight.set_color(LColor(1.0, 1.0, 1.0, 1.0))
-        plight.set_attenuation((0.0, 0.0, 0.03))
+        plight.set_attenuation(HEADLIGHT_ATTENUATION)
         pl_path = cam.attach_new_node(plight)
         pl_path.set_pos(0, 0, 0)
         self.scene_root.set_light(pl_path)

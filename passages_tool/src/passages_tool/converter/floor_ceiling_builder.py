@@ -85,7 +85,13 @@ def build_triangulated_polygons(
     tex_h: int,
     egg_tex: Optional[EggPolygon],
 ) -> list[EggPolygon]:
-    """Triangulate the level floor/ceiling boundary using closed wall loops."""
+    """Triangulate the level floor/ceiling boundary using closed wall loops.
+
+    Limitation: the largest closed wall is the outer boundary and every other
+    closed wall is treated as a hole. Separate rooms (two disjoint closed
+    loops) therefore punch a hole in the larger room instead of producing two
+    floors. Author one outer loop, or keep rooms as a single polyline.
+    """
     # Find all closed wall polylines (either marked closed or geometrically closed)
     def is_wall_closed(pl: Polyline) -> bool:
         if pl.type != PolylineType.WALL or len(pl.vertices) < 3:

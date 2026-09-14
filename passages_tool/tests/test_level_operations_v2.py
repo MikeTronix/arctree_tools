@@ -306,3 +306,35 @@ class TestDeleteVertexAdjustments:
         # Edge (2,3) should shift down to (1,2).
         assert len(pl.edges) == 1
         assert (1, 2) in pl.edges
+
+
+class TestInsertVertexEyePath:
+    def test_insert_splits_spanned_edge(self):
+        level, pl = _eyepath_with_verts(3)
+        level.add_eyepath_edge(pl.id, 0, 1)
+        level.add_eyepath_edge(pl.id, 1, 2)
+        level.add_eyepath_edge(pl.id, 1, 0)  # reverse of first
+
+        level.insert_vertex(pl.id, 0, 0.5, 0.0)
+
+        assert len(pl.vertices) == 4
+        assert (0, 1) in pl.edges
+        assert (1, 2) in pl.edges
+        assert (2, 1) in pl.edges
+        assert (1, 0) in pl.edges
+        assert (0, 2) not in pl.edges
+        assert (2, 3) in pl.edges  # old (1,2) shifted
+
+
+class TestOverlapIntervals:
+    def test_overlapping_interval_is_rejected(self):
+        level, pl = _wall_with_verts(6)
+        level.add_texture_interval(pl.id, TextureInterval(0, 4, texture="a.png"))
+        level.add_texture_interval(pl.id, TextureInterval(2, 5, texture="b.png"))
+        assert len(pl.texture_intervals) == 1
+
+    def test_adjacent_intervals_allowed(self):
+        level, pl = _wall_with_verts(6)
+        level.add_texture_interval(pl.id, TextureInterval(0, 3, texture="a.png"))
+        level.add_texture_interval(pl.id, TextureInterval(3, 5, texture="b.png"))
+        assert len(pl.texture_intervals) == 2

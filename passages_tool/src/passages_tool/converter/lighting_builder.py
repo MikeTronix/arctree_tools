@@ -8,6 +8,7 @@ from __future__ import annotations
 from typing import Any
 from panda3d.core import AmbientLight, PointLight, LColor, NodePath
 
+from passages_tool.config import HEADLIGHT_ATTENUATION
 from passages_tool.editor.level import Level, PolylineType
 
 
@@ -52,7 +53,7 @@ def setup_lighting(scene_root: NodePath, level: Level) -> list[NodePath]:
 
             # Attenuation constants: (constant, linear, quadratic)
             # Quadratic term of 0.03 gives a smooth falloff over 10-20 meters
-            plight.set_attenuation((0.0, 0.0, 0.03))
+            plight.set_attenuation(HEADLIGHT_ATTENUATION)
 
             pl_path = scene_root.attach_new_node(plight)
             pl_path.set_pos(x_world, y_world, z_world)

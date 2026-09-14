@@ -12,6 +12,7 @@ from typing import Optional
 from passages_tool.editor.level import (
     Level,
     PolylineType,
+    _texture_intervals_overlap,
     interval_edge_indices,
     wall_edge_index_pairs,
 )
@@ -57,6 +58,20 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
                     covered.add(e)
 
         uncovered = [e for e in range(edge_count) if e not in covered]
+        ivs = pl.texture_intervals
+        for i, a in enumerate(ivs):
+            for b in ivs[i + 1:]:
+                if _texture_intervals_overlap(a, b):
+                    warnings.append(ValidationWarning(
+                        arch_id=pl.id, v_from=a.from_vertex, v_to=a.to_vertex,
+                        angle_deg=0.0,
+                        message=(
+                            f"Wall {pl.id[:8]}... has overlapping texture intervals "
+                            f"V{a.from_vertex}–{a.to_vertex} and V{b.from_vertex}–{b.to_vertex} "
+                            f"— they will z-fight."
+                        ),
+                    ))
+                    break
         if uncovered:
             shown = ", ".join(str(e) for e in uncovered[:8])
             more = "" if len(uncovered) <= 8 else f" (+{len(uncovered) - 8} more)"
@@ -89,6 +104,23 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
     return warnings
 
 
+def validate_structure(level: Level) -> list[ValidationWarning]:
+    """Warn about document-level issues (EyePath count, etc.)."""
+    warnings: list[ValidationWarning] = []
+    paths = level.eyepaths()
+    if len(paths) > 1:
+        extras = ", ".join(pl.id[:8] + "…" for pl in paths[1:3])
+        more = f" (+{len(paths) - 3} more)" if len(paths) > 3 else ""
+        warnings.append(ValidationWarning(
+            arch_id=paths[1].id, v_from=-1, v_to=-1, angle_deg=0.0,
+            message=(
+                f"Level has {len(paths)} EyePath polylines; bake and preview use "
+                f"only the first. Extra: {extras}{more}."
+            ),
+        ))
+    return warnings
+
+
 def validate_arch_visibility(
     level: Level,
     threshold_deg: float = 30.0,
@@ -100,12 +132,9 @@ def validate_arch_visibility(
     """
     warnings = []
 
-    # 1. Find EyePath polyline
-    eyepath_pl = None
-    for pl in level.polylines.values():
-        if pl.type == PolylineType.EYEPATH:
-            eyepath_pl = pl
-            break
+    # 1. Find EyePath polyline (bake/preview use the first; extras are warned separately)
+    paths = level.eyepaths()
+    eyepath_pl = paths[0] if paths else None
 
     if not eyepath_pl or not eyepath_pl.edges:
         return warnings

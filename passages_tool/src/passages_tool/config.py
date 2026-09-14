@@ -25,10 +25,20 @@ ZOOM_STEP: float = 0.10
 
 # ── Grid ──────────────────────────────────────────────────────────────────────
 
-GRID_CELL:        float = 1.0          # world-unit cell size
+GRID_CELL:        float = 1.0          # fallback if snap_grid is missing/zero
 GRID_COLOR_MINOR: tuple = (0.25, 0.25, 0.30, 1.0)
 GRID_COLOR_MAJOR: tuple = (0.40, 0.40, 0.50, 1.0)
 GRID_MAJOR_EVERY: int   = 8            # every N cells gets the major line
+
+# ── Viewport picking ──────────────────────────────────────────────────────────
+
+PICK_RADIUS_PX: float = 12.0           # screen-space vertex/edge hit radius
+
+# ── Bake camera ───────────────────────────────────────────────────────────────
+
+CAMERA_NEAR: float = 0.1
+CAMERA_FAR: float = 100.0
+HEADLIGHT_ATTENUATION: tuple = (0.0, 0.0, 0.03)
 
 # ── Polylines ─────────────────────────────────────────────────────────────────
 

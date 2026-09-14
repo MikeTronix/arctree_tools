@@ -73,6 +73,10 @@ class Toolbar:
             if activated:
                 self._cb.get("save", lambda: None)()
 
+            activated, _ = imgui.menu_item("Save As…", "Ctrl+Shift+S", False)
+            if activated:
+                self._cb.get("save_as", lambda: None)()
+
             imgui.separator()
             activated, _ = imgui.menu_item("Exit", "Alt+F4", False)
             if activated:

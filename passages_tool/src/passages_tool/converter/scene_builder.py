@@ -19,55 +19,54 @@ from passages_tool.converter.wall_builder import build_wall_strips
 from passages_tool.editor.level import Level
 
 
-def build_scene(level: Level, output_dir: Path, tex_dir: Optional[Path] = None) -> Path:
+def _write_egg(path: Path, groups) -> None:
+    egg = EggData()
+    egg.set_coordinate_system(CS_zup_right)
+    for grp in groups:
+        egg.add_child(grp)
+    egg.write_egg(str(path))
+
+
+def build_scene(
+    level: Level,
+    output_dir: Path,
+    tex_dir: Optional[Path] = None,
+    write_combined: bool = True,
+) -> Path:
     """
-    Assemble and export individual wall, floor, ceiling, and arch EGG meshes,
-    as well as a combined scene.egg file for easy pview verification.
-    Returns the path to the combined scene.egg file.
+    Assemble and export individual wall, floor, ceiling, and arch EGG meshes.
+    When `write_combined` is True, also write scene.egg (a second geometry
+    pass, for pview). The runtime loader uses the four component files, so
+    in-editor preview and the baker can skip the combined file.
+    Returns the path to scene.egg if written, otherwise walls.egg.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # 1. Write individual EGG files
-    # Walls
-    walls_egg = EggData()
-    walls_egg.set_coordinate_system(CS_zup_right)
-    for grp in build_wall_strips(level, tex_dir):
-        walls_egg.add_child(grp)
-    walls_egg.write_egg(str(output_dir / "walls.egg"))
+    wall_groups = build_wall_strips(level, tex_dir)
+    floor_grp = build_floor(level, tex_dir)
+    ceil_grp = build_ceiling(level, tex_dir)
+    arch_groups = build_arches(level, tex_dir)
 
-    # Floor
-    floor_egg = EggData()
-    floor_egg.set_coordinate_system(CS_zup_right)
-    floor_egg.add_child(build_floor(level, tex_dir))
-    floor_egg.write_egg(str(output_dir / "floor.egg"))
-
-    # Ceiling
-    ceil_egg = EggData()
-    ceil_egg.set_coordinate_system(CS_zup_right)
-    ceil_egg.add_child(build_ceiling(level, tex_dir))
-    ceil_egg.write_egg(str(output_dir / "ceiling.egg"))
-
-    # Arches
-    arches_egg = EggData()
-    arches_egg.set_coordinate_system(CS_zup_right)
-    for grp in build_arches(level, tex_dir):
-        arches_egg.add_child(grp)
-    arches_egg.write_egg(str(output_dir / "arches.egg"))
-
-    # 2. Write combined scene EGG file
-    scene_egg = EggData()
-    scene_egg.set_coordinate_system(CS_zup_right)
-
-    for grp in build_wall_strips(level, tex_dir):
-        scene_egg.add_child(grp)
-    scene_egg.add_child(build_floor(level, tex_dir))
-    scene_egg.add_child(build_ceiling(level, tex_dir))
-    for grp in build_arches(level, tex_dir):
-        scene_egg.add_child(grp)
+    _write_egg(output_dir / "walls.egg", wall_groups)
+    _write_egg(output_dir / "floor.egg", [floor_grp])
+    _write_egg(output_dir / "ceiling.egg", [ceil_grp])
+    _write_egg(output_dir / "arches.egg", arch_groups)
 
     scene_path = output_dir / "scene.egg"
-    scene_egg.write_egg(str(scene_path))
-    return scene_path
+    if write_combined:
+        # Groups are already parented to the component EggData objects, so the
+        # combined file is a second build. Skip this in the editor/baker.
+        scene_egg = EggData()
+        scene_egg.set_coordinate_system(CS_zup_right)
+        for grp in build_wall_strips(level, tex_dir):
+            scene_egg.add_child(grp)
+        scene_egg.add_child(build_floor(level, tex_dir))
+        scene_egg.add_child(build_ceiling(level, tex_dir))
+        for grp in build_arches(level, tex_dir):
+            scene_egg.add_child(grp)
+        scene_egg.write_egg(str(scene_path))
+        return scene_path
+    return output_dir / "walls.egg"
 
 
 def load_scene(level: Level, egg_dir: Path, loader: Any) -> NodePath:

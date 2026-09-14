@@ -68,6 +68,18 @@ class ViewportCamera:
         return self._film_w
 
     @property
+    def film_h(self) -> float:
+        return self._film_w / self._aspect()
+
+    @property
+    def win_w(self) -> int:
+        return self._win_w
+
+    @property
+    def win_h(self) -> int:
+        return self._win_h
+
+    @property
     def zoom(self) -> float:
         """Effective zoom: world units per screen pixel (approx)."""
         return self._film_w / self._win_w

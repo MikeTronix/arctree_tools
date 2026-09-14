@@ -14,6 +14,7 @@ from passages_tool.io.level_format import LevelIOError, load
 from passages_tool.renderer.manifest import (
     build_manifest,
     find_missing_images,
+    find_stale_images,
     save_manifest,
 )
 from passages_tool.converter.scene_builder import build_scene
@@ -43,7 +44,7 @@ def main() -> None:
         "--width", type=int, default=None, help="Render width (defaults to level parameter or 1024)."
     )
     parser.add_argument(
-        "--height", type=int, default=None, help="Render height (defaults to level parameter or 768)."
+        "--height", type=int, default=None, help="Render height (defaults to level render_height, typically 576)."
     )
     parser.add_argument(
         "--textures",
@@ -121,7 +122,7 @@ def main() -> None:
     # 3. Build scene geometry
     print("Building 3D scene geometry...")
     try:
-        build_scene(level, scene_dir, tex_dir)
+        build_scene(level, scene_dir, tex_dir, write_combined=False)
     except Exception as e:
         print(f"Error compiling scene geometry: {e}", file=sys.stderr)
         sys.exit(1)
@@ -212,6 +213,14 @@ def main() -> None:
         manifest = build_manifest(level, output_dir, tex_dir)
         save_manifest(manifest, save_path)
         print("Final manifest saved with all rendered assets.")
+
+        stale = find_stale_images(manifest, output_dir)
+        for stale_path in stale:
+            try:
+                stale_path.unlink()
+                print(f"Removed stale render: {stale_path.name}")
+            except OSError as e:
+                print(f"Could not remove stale {stale_path.name}: {e}", file=sys.stderr)
     finally:
         renderer.close()
 
