@@ -52,13 +52,12 @@ The tool is a desktop Panda3D application with a Dear ImGui overlay. Baking stil
 
 ### First run
 
-Double-click `run.bat` in the `passages_tool/` folder (or run it from any working directory — it `cd`s to its own folder). On the first run it will:
+Double-click `run.bat` in the `passages_tool/` folder (or run it from any working directory — it `cd`s to its own folder). `run.bat` and `bake.bat` share `_ensure_venv.bat`, which keeps a **local** `.venv` next to the tool. That isolation is intended: do not reuse Miniconda or the ArcTree repo-root env. On first run, or if that venv is broken (typical after uninstalling Miniconda), it will:
 
-1. Create a `.venv/` virtual environment
-2. Install dependencies from PyPI
-3. Launch the editor
-
-Subsequent launches skip install and open immediately.
+1. Remove the broken `.venv` if present
+2. Create a new `.venv/` with a standalone Python 3.10+ (`python3.12`, then `py -3`, then `python`; skips interpreters that already live inside another venv)
+3. Install dependencies from PyPI
+4. Launch the editor (or continue the bake)
 
 Image assets are not in git. Before the palette or baker can find sample textures:
 
@@ -341,15 +340,13 @@ Bake uses the first EyePath. Midpoint frames are the geometric 50% of each undir
 
 If that fails: `.venv\Scripts\python.exe -m pip install panda3d-imgui`
 
-### `ModuleNotFoundError: No module named 'p3dimgui'`
+### `ModuleNotFoundError: No module named 'p3dimgui'` / `No Python at '...miniconda3...'`
 
-Broken Conda pip shim. Delete `.venv` and run `run.bat` again, or:
+The local `.venv` was built against an interpreter that is gone (often leftover Miniconda). Delete it and let the launcher recreate it; do not point `python` at some other project's venv:
 
 ```bat
 rmdir /s /q .venv
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install --upgrade pip
-.venv\Scripts\python.exe -m pip install -e .[dev]
+run.bat
 ```
 
 ### `Read timed out` during pip install

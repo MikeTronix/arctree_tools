@@ -60,7 +60,7 @@ passages_tool/
 ├── assets/
 │   └── sample_textures/   PNG textures (extract sample_assets.tar)
 ├── json/                  Sample level JSON files
-├── run.bat / bake.bat     Windows launchers
+├── run.bat / bake.bat     Windows launchers (local .venv via _ensure_venv.bat)
 └── docs/                  User guide and rendering design
 ```
 
@@ -89,10 +89,12 @@ This will extract the standard assets into the `assets/sample_textures/` directo
 Full controls and properties: `docs/user_guide.md`.
 
 ### Running the Editor
+`run.bat` and `bake.bat` share `_ensure_venv.bat`. A **local** `.venv` in this folder is intended (not the ArcTree repo-root env, not Miniconda). If that venv still points at an uninstalled interpreter (e.g. leftover Miniconda), the helper deletes and recreates it. Host Python is a standalone 3.10+ (`python3.12`, then `py -3`, then `python`); interpreters that already live inside another venv are skipped.
+
 ```bash
 run.bat
-# or
-python -m passages_tool.main
+# or, with the local venv already created:
+.venv\Scripts\python.exe -m passages_tool.main
 ```
 
 ### Running the 3D Geometry Converter CLI

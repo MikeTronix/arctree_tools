@@ -22,7 +22,7 @@ Status: **done** · **partial** · **open**
 | §3 P1 editor interaction | **done** | Nested `f07a0e3`; GitHub `b9f5b0a`; 3.13 typed warnings |
 | §4 P1 bake / converter | **partial** | Per-room floors; geometric midpoints kept; `bake.bat` ships; 4.2 combined `scene.egg` still a second CLI pass |
 | §5 P2 architecture | **open** | `Level.eyepaths()` landed as a side effect of 4.1 |
-| §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat` cds to its folder; rendering design marked superseded and tables patched |
+| §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat`/`bake.bat` share `_ensure_venv.bat` (repairs leftover Miniconda venvs); rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | After remaining P1 forks |
 
@@ -250,7 +250,7 @@ Near/far/headlight now share config, but the two methods are still duplicated. A
 | User guide matches W/A/E/R, v2, drag, derived FOV, Validate, Save As | `docs/user_guide.md` rewritten |
 | README controls + sample 1024×576 / derived `fov_h` ≈ 91.5 | `README.md` |
 | Empty-window → `renders_out/` walkthrough | README § and user guide §3 |
-| `run.bat` `cd /d "%~dp0"` | Matches `bake.bat` |
+| `run.bat` / `bake.bat` via `_ensure_venv.bat` | Local `.venv` is intended; broken leftover (Miniconda) is deleted and recreated |
 | Rendering design status + FOV / types / floor / anchors / manifest | `docs/passages_rendering_design.md` banner + tables |
 
 **Still not a docs issue:** File → Bake Level… is an editor feature (§8.1), not a documentation gap. `bake.bat` is documented.
@@ -298,6 +298,7 @@ Slider grouping is done via `_hist` coalesce. Command-pattern history is only ne
 9. JSON Schema for `.passages.json` and `manifest.json`.
 10. Drop tkinter file dialogs.
 11. **Turn slew from a per-node yaw strip (client + baker).** Turns today alpha-crossfade two directed stills, so a 40° glance and a 160° about-face feel the same (no optic flow; player checks the compass). Bake **one cylindrical 360°×`fov_v` strip per EyePath vertex** (four 90° cube faces unwrapped; not a single pinhole 360). Runtime: pan a sliding `fov_h` window for a duration proportional to |Δyaw| (min ~80 ms, cap ~400 ms), then land on the existing hi-res `vXXXX_to_vYYYY` still. Hide anchors during the slew. Sweet-spot strip ~**2048×341** at 1024×576 / 91.5° HFOV (~2× upscale in motion). This is mostly a **minigame** change; the baker must grow first (extra renders per node, manifest key e.g. `eyepoints.v0000.yaw_strip`). Do not replace sharp viewpoints with the strip.
+12. **Adjustable / HiDPI UI scale (editor).** On high-resolution monitors the ImGui panels, menu bar, and vertex labels are too small to use at a normal sitting distance. Add a persistent UI scale (e.g. 100/125/150/200%, or a font-size slider) via `imgui.get_io().font_global_scale` and `style.scale_all_sizes`, stored in `editor_state.json`. Default could follow Windows DPI. Viewport world units stay unchanged; only overlay chrome and text grow.
 
 Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into a content editor.
 
@@ -307,7 +308,7 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 
 P0, core P1, docs pass, per-room floors, and small leftovers are done. Geometric midpoints kept.
 
-Next: **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles. Feature 11 (yaw-strip slew) is a minigame+baker project, not a leftover.
+Next: **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles. Feature 11 (yaw-strip slew) is a minigame+baker project, not a leftover. Feature 12 (HiDPI / adjustable editor text) is editor-only and not implemented.
 
 ---
 
@@ -323,5 +324,5 @@ Next: **P2 splits** — `main.py` modules, `_render_camera` helper, logging, til
 | Convert | `src/passages_tool/converter/*.py` |
 | Bake | `src/passages_tool/renderer/viewpoint_renderer.py`, `manifest.py`, `occluder.py`, `convert_to_jpeg.py`, `__main__.py` |
 | Docs | `README.md`, `docs/user_guide.md`, `docs/passages_rendering_design.md` |
-| Launch | `run.bat`, `bake.bat`, `pyproject.toml` |
+| Launch | `run.bat`, `bake.bat`, `_ensure_venv.bat`, `pyproject.toml` |
 | Publish | GitHub `MikeTronix/arctree_tools` folder `passages_tool/` (not a standalone remote) |
