@@ -4,8 +4,9 @@ REM Creates a .venv on first run, then launches the tool.
 REM Uses python -m pip (not the pip shim) to avoid Conda venv pip issues.
 
 setlocal
+cd /d "%~dp0"
 
-set VENV_DIR=%~dp0.venv
+set VENV_DIR=.venv
 set VENV_PYTHON=%VENV_DIR%\Scripts\python.exe
 
 REM ── Create venv if it doesn't exist ──────────────────────────────────────────
@@ -18,7 +19,7 @@ if not exist "%VENV_PYTHON%" (
         exit /b 1
     )
     echo [passages_tool] Installing dependencies...
-    "%VENV_PYTHON%" -m pip install -e "%~dp0.[dev]" --quiet
+    "%VENV_PYTHON%" -m pip install -e ".[dev]" --quiet
     if errorlevel 1 (
         echo ERROR: pip install failed. Check your internet connection.
         pause

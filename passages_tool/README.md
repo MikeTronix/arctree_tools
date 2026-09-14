@@ -7,7 +7,7 @@ A standalone Python + Panda3D application for designing, compiling, and baking 2
 ## Features
 
 - **Orthographic 2D Viewport** — Pan (middle-mouse drag) and zoom (scroll wheel) with corrected camera projection matrix mappings.
-- **Advanced Polyline Editor** — Draw, move, and edit vertex lists for **Walls**, **Arches** (supporting billboards and fixed orientation), and **EyePaths** (transition viewpoints).
+- **Advanced Polyline Editor** — Draw, move, and edit **Walls**, **Arches** (billboard or fixed orientation), **EyePaths** (transition viewpoints), and **Anchors** (runtime sprite slots).
 - **Texture Intervals** — Assign multiple textures along different segments of a single Wall polyline with custom horizontal offsets.
 - **Grid Snapping** — Toggle grid snap on/off (via `G` key) and customize the grid snap spacing metadata.
 - **In-Editor 3D Preview** — Render an offscreen perspective view directly from a selected EyePath vertex inside an ImGui preview panel.
@@ -37,12 +37,15 @@ passages_tool/
 │   │   ├── viewpoint_renderer.py     Panda3D offscreen perspective bakes
 │   │   ├── transition_renderer.py    Linear traversal path calculator & Midpoint frame generator
 │   │   ├── manifest.py               Render manifest manager
-│   │   └── convert_to_jpeg.py        Game deployment KTX2/JPEG transcoder
+│   │   ├── convert_to_jpeg.py        Game deployment KTX2/JPEG transcoder
+│   │   ├── occluder.py               CPU ray + arch-alpha occlusion
+│   │   └── occlusion.py              Anchor extent coverage sampling
 │   ├── editor/            Core Data Model & Logic
 │   │   ├── level.py       Level structure, migration, and CRUD handlers
 │   │   ├── polyline.py    Scene graph representation of drawable lines
 │   │   ├── history.py     Undo/redo command snapshot manager
-│   │   └── validator.py   Fixed-arch visibility check engine
+│   │   ├── validator.py   Arch visibility, textures, extra EyePaths
+│   │   └── arch_utils.py  Wall-nearest snap for arches
 │   ├── ui/                Dear ImGui Panel Overlays
 │   │   ├── toolbar.py     Top toolbar, mode selector, grid status
 │   │   ├── palette.py     Texture browser, thumbnails, detail view
@@ -55,8 +58,10 @@ passages_tool/
 │       ├── camera.py      Coordinate space raycaster and pan/zoom lens
 │       └── grid.py        LineSegs layout grid background
 ├── assets/
-│   └── sample_textures/   PNG textures and sprites for testing
-└── json/                  Sample level JSON files
+│   └── sample_textures/   PNG textures (extract sample_assets.tar)
+├── json/                  Sample level JSON files
+├── run.bat / bake.bat     Windows launchers
+└── docs/                  User guide and rendering design
 ```
 
 ---
@@ -74,9 +79,20 @@ tar -xf sample_assets.tar
 ```
 This will extract the standard assets into the `assets/sample_textures/` directory.
 
+### From empty window to baked frames
+1. `tar -xf sample_assets.tar` (once).
+2. `run.bat` — editor; textures load from `assets/sample_textures/` on first run.
+3. File → Open `json/verify.passages.json` (or draw Wall `W` / EyePath `E`).
+4. `V` to Validate. Save.
+5. `bake.bat verify` → `renders_out/` (PNG + `manifest.json`).
+6. Optional: `python -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out` (put `basisu.exe` in `bin/` for KTX2).
+
+Full controls and properties: `docs/user_guide.md`.
+
 ### Running the Editor
-To run the 2D layout editor:
 ```bash
+run.bat
+# or
 python -m passages_tool.main
 ```
 
@@ -110,22 +126,25 @@ python -m pytest
 
 | Category | Action | Input |
 |---|---|---|
-| **Viewport** | Pan viewport | Middle-mouse drag |
-| | Zoom viewport | Scroll wheel |
-| **Tools** | Select tool | `S` or toolbar |
-| | Draw Polyline tool | `P` or toolbar |
-| | Toggle Grid Snap | `G` or toolbar |
-| | Toggle Asset Validator | `V` or toolbar |
-| **Editing** | Add vertex | Left-click (draw mode) |
-| | Select vertex / polyline | Left-click (select mode) |
-| | Move vertex | Left-drag handle (select mode) |
-| | Delete vertex | `Del` key |
-| | Finish polyline | `Enter` or right-click |
-| **App** | Undo | `Ctrl+Z` |
-| | Redo | `Ctrl+Y` |
-| | New level | `Ctrl+N` |
-| | Open level | `Ctrl+O` |
-| | Save level | `Ctrl+S` |
+| **Viewport** | Pan | Middle-mouse drag |
+| | Zoom | Scroll wheel |
+| **Tools** | Select | `S` |
+| | Draw Wall | `W` |
+| | Place Arch | `A` |
+| | Draw EyePath | `E` |
+| | Place Anchor | `R` |
+| | Toggle snap | `G` |
+| | Validate | `V` |
+| **Editing** | Add vertex | Left-click (draw) |
+| | Select handle or segment | Left-click (select) |
+| | Move vertex | Left-drag handle (select) |
+| | Delete polyline | `Del` |
+| | Finish wall / eyepath | `Enter` or right-click |
+| | Arch snap accept / keep billboard | `Enter` / `Esc` |
+| **App** | Undo / Redo | `Ctrl+Z` / `Ctrl+Y` |
+| | New / Open / Save / Save As | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` |
+
+Letter shortcuts are ignored while typing in an ImGui field.
 
 ---
 
@@ -141,14 +160,14 @@ Levels are serialized to JSON in a version 2 format that stores scale details, t
     "author": "MRW",
     "wall_height": 4.0,
     "eye_height": 1.7,
-    "fov_h": 90.0,
+    "fov_h": 91.5,
     "fov_v": 60.0,
     "pixels_per_meter": 256.0,
     "fog_start": 20.0,
     "fog_end": 40.0,
-    "snap_grid": 0.5,
+    "snap_grid": 0.25,
     "render_width": 1024,
-    "render_height": 768,
+    "render_height": 576,
     "floor_texture": "floor.png",
     "ceiling_texture": "ceiling_1.png"
   },
@@ -196,3 +215,5 @@ Levels are serialized to JSON in a version 2 format that stores scale details, t
   ]
 }
 ```
+
+`fov_h` is **derived** from `fov_v` and `render_width`/`render_height` on load and save (here 60° V at 1024×576 ≈ 91.5° H). Do not author it independently. `grid.cell_size` and `tiles` are unused by the viewport and baker. EyePath `edges` are directed. Bake uses the first EyePath only.

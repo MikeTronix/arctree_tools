@@ -1,8 +1,18 @@
 # Passages Minigame — Rendering System Design Document
 
-> **Status:** Decisions locked as of 2026-06-16  
+> **Status:** Partially superseded. Decisions locked as of 2026-06-16; tables below patched 2026-09-13 to match the shipping tool.
 > **Tool:** `_local/tools/passages_tool/`  
 > **Relates to:** `design_docs/arc_dev_spec_<latest>.md` (Passages minigame entry)
+>
+> **What the tool does now (vs this document as originally written):**
+> - Four polyline types: Wall, Arch, EyePath, Anchor (Anchor colour is blue-violet, not magenta).
+> - `fov_h` is derived from `fov_v` × render aspect (`2 * atan(aspect * tan(fov_v/2))`). Author VFOV and resolution only. Default bake **1024×576**, VFOV 60° → HFOV ≈ **91.5°**.
+> - Texture scale is `pixels_per_meter` (legacy `texture_pixel_size` migrates).
+> - EyePath `edges` are **directed** `[from, to]`. Bake/preview use the **first** EyePath.
+> - Floor/ceiling are triangulated from closed wall loops (largest loop = outer, others = holes), not a single bounding-box quad.
+> - Anchor visibility: occlusion is baked per **eyepoint** (CPU ray + arch alpha); FOV/frustum is applied at **runtime**. See `design_docs/passages_anchor_visibility_bake_06JUL26.md`.
+> - Midpoint frames are the geometric 50% of the edge (the “no edge-on arches mid-move” cap is not applied at bake).
+> - Editor how-to: `docs/user_guide.md`.
 
 ---
 
@@ -36,21 +46,21 @@ These are stored in the level metadata and apply to the entire level:
 |---|---|---|
 | `wall_height` | Height of all walls and the implicit ceiling, in world units | `4.0` |
 | `eye_height` | Camera height above floor for all EyePath viewpoints | `1.7` |
-| `fov_h` | Horizontal field of view for all renders, in degrees | `90.0` |
-| `fov_v` | Vertical field of view for all renders, in degrees | `60.0` |
-| `texture_pixel_size` | World units per texture pixel (sets dimensional texture scale) | `0.01` |
+| `fov_v` | Vertical field of view for all renders, in degrees (authored) | `60.0` |
+| `fov_h` | Horizontal FOV, **derived** from `fov_v` and render aspect | `~91.5` at 1024×576 |
+| `pixels_per_meter` | Texture pixels per world metre (replaces `texture_pixel_size`) | `256.0` |
 | `fog_start` | World-unit depth at which fog begins (limits visible range) | `20.0` |
 | `fog_end` | World-unit depth at which fog is fully opaque | `40.0` |
-| `snap_grid` | Editor snap grid size in world units (small; keeps paths natural) | `0.25` |
+| `snap_grid` | Editor snap grid size in world units (also the drawn grid) | `0.25` |
 | `render_width` | Horizontal resolution of baked viewpoint renders in pixels | `1024` |
-| `render_height` | Vertical resolution of baked viewpoint renders in pixels | `768` |
+| `render_height` | Vertical resolution of baked viewpoint renders in pixels | `576` |
 
 
 ---
 
 ## 4. Polyline Types
 
-The editor supports three polyline types.  Each is displayed in a distinct colour with distinct visual cues.
+The editor supports four polyline types (Wall, Arch, EyePath, Anchor).  Each is displayed in a distinct colour with distinct visual cues.
 
 ### 4.1 Wall
 
@@ -142,14 +152,14 @@ An EyePath defines the allowed viewpoint locations and the connectivity between 
 - The player selects facing direction with **arrow keys** or **`A` / `D`** (cycle through accessible neighbours).
 
 **Connectivity:**
-- Stored as an undirected graph: each vertex has a list of indices of its accessible neighbours.
-- In the editor, the user draws EyePath edges explicitly (like polyline edges) or uses an auto-connect-to-nearest tool.
+- Stored as a **directed** graph: each edge `[v_from, v_to]` is one baked view (camera at `from`, looking at `to`). The baker also emits the reverse direction.
+- In the editor, drawing consecutive vertices adds those directed edges; Properties can add/remove pairs by index.
 
 **Data fields:**
 ```
 type:              "eyepath"
 vertices:          [[x, z], ...]
-edges:             [[v_from, v_to], ...]   # undirected pairs
+edges:             [[v_from, v_to], ...]   # directed pairs
 ```
 
 ---
@@ -159,17 +169,11 @@ edges:             [[v_from, v_to], ...]   # undirected pairs
 An Anchor defines a physical slot in the level where dynamic 2D billboard sprites (NPCs, items, monsters) can be dynamically projected and rendered at runtime. Anchors do not compile into 3D meshes in the exported level geometry; instead, they serve as semantic positioning landmarks and are processed during the baking phase to precalculate viewpoint visibility and screen-space projections.
 
 **Visual representation in editor:**
-- **Colour:** Magenta (`#E840C8`)
+- **Colour:** Blue-violet (not magenta; red is reserved for Validate errors)
 - Displayed as a circle with crosshairs and a bounding radius representing the sprite's occupancy/interaction area.
 
 **Visibility & Projection Processing:**
-During the offline baking phase, for each directed EyePath edge `v_from -> v_to`, the renderer calculates if the Anchor is visible and precomputes its screen-space coordinates.
-An Anchor is considered **visible** from a viewpoint if:
-1. It is within the camera's horizontal field of view (`fov_h` / 2) relative to the gaze direction.
-2. The distance from the viewpoint to the anchor is less than or equal to `max_distance` (and within `fog_end`).
-3. **Line-of-Sight (LOS) check:** The straight-line segment from the viewpoint coordinate to the anchor coordinate does not intersect any Wall polylines or opaque/non-transparent Arch polylines.
-
-If visible, the renderer projects the anchor's 3D position `(x, y, z_offset)` onto the viewpoint camera plane and writes the projected screen-space coordinate and distance-based scale factor into the manifest JSON.
+Occlusion is baked **per eyepoint** (CPU ray vs wall/arch quads, sampling cutout-arch texture alpha). The manifest stores `eyepoints[vXXXX].visible_anchors` with `occ_coverage` and world position. FOV / frustum membership and screen projection run in the **client** against the live look-at (see `passages_anchor_visibility_bake_06JUL26.md`). Do not treat the old per-edge 2D LOS + FOV pre-projection as current.
 
 **Data fields:**
 ```
@@ -188,16 +192,15 @@ sprite_count:      int             # Expected number of sprites allowed at this 
 
 ### 5.1 Floor
 
-- A single quad at Z = 0.
-- Spans the bounding box of all Wall polylines in the level, plus a small margin.
-- UV-mapped using the level's `texture_pixel_size` from a designated floor texture.
+- Triangulated from **closed Wall** loops at Z = 0 (bounding-box quad is a fallback if triangulation fails).
+- The largest closed loop is the outer boundary; every other closed wall is treated as a **hole**. Two disjoint rooms therefore do **not** each get a floor (documented limitation).
+- UV-mapped using `pixels_per_meter` from `floor_texture`.
 - No perturbations; always perfectly flat.
 
 ### 5.2 Ceiling
 
-- A single quad at Z = `wall_height`.
-- Same XZ extent as the floor.
-- Textured with a designated ceiling texture.
+- Same triangulation as the floor, at Z = `wall_height`, winding reversed.
+- Textured with `ceiling_texture`.
 - No cutouts or perturbations.  Arches provide the *illusion* of varied ceiling height; the ceiling itself is always flat.
 
 > **Note:** The ceiling is visible from all viewpoints through any gaps between Arches.  Arches must be designed so their opaque or alpha regions prevent the ceiling from looking structurally false.
@@ -217,8 +220,8 @@ Walls use `texture_intervals` instead of a single texture.  Each interval covers
 **UV continuity:** When a texture interval ends and a new one begins, the new interval starts at its own `x_offset`.  If two consecutive intervals use the **same texture**, the UV offset is carried over automatically so there is no seam.
 
 **Dimensional UV mapping:**
-- U coordinate along the wall = `distance_along_wall / texture_pixel_size / texture_width_pixels`
-- V coordinate vertically = `z / texture_pixel_size / texture_height_pixels`
+- U coordinate along the wall = `distance_along_wall * pixels_per_meter / texture_width_pixels`
+- V coordinate vertically = `z * pixels_per_meter / texture_height_pixels`
 - V = 0 is always at the floor (Z = 0); V = 1 is at the top of the texture as authored.
 - V offsets when starting a new texture are **not supported** (textures are authored with a defined floor baseline).
 
@@ -230,7 +233,7 @@ Walls use `texture_intervals` instead of a single texture.  Each interval covers
 
 ### 6.3 Floor and Ceiling Textures
 
-- Tiled using `texture_pixel_size` with U along X and V along Z.
+- Tiled using `pixels_per_meter` with U along X and V along Z.
 - Stored in level metadata as `floor_texture` and `ceiling_texture`.
 
 ---
@@ -272,7 +275,7 @@ For each Arch:
 
 ### 7.5 Floor and Ceiling Generation
 
-- Two large quads with tiled UV mapping.
+- Triangulated meshes from closed wall loops (see §5). Bounding-box fallback if needed.
 - No alpha; always rendered first (no depth sorting needed).
 
 ### 7.6 Lighting
@@ -317,7 +320,11 @@ To represent movement between eye points:
 3. The filename is unordered and numerically sorted by vertex index: `mid_v[lower]_to_v[higher].ktx2` (with `.jpg` fallback).
 4. During movement, the game client executes a two-phase dolly-zoom crossfade: scaling and fading out the source image while scaling and fading in the midpoint image (0–150ms), followed by scaling/fading the midpoint image out while scaling/fading the destination image in (150–300ms).
 
-> **Constraint:** The midpoint frame must satisfy the same visibility and perspective constraints as static viewpoints (e.g., fixed arches must not appear edge-on).
+> **Constraint (design intent, not current bake):** The midpoint frame should satisfy the same visibility constraints as static viewpoints (fixed arches not edge-on). The baker currently places the camera at the **geometric 50%** of the edge; the edge-on-capped travel path in `transition_renderer.py` is unused. Changing this is a content-visible fork.
+
+### 8.3 Manifest
+
+Bake writes `manifest.json` **version 2**: `edges` (per directed `vXXXX_to_vYYYY`: image paths, eyepoint, facing) and `eyepoints` (per vertex: `xyz`, `visible_anchors` with `occ_coverage`). The shipping transcoder rewrites image paths under `edges` (not a flat top-level map).
 
 ---
 
@@ -325,7 +332,7 @@ To represent movement between eye points:
 
 ### 9.1 Polyline Type System
 
-- Add a `type` field to each polyline: `wall | arch | eyepath`.
+- Add a `type` field to each polyline: `wall | arch | eyepath | anchor`.
 - Type selector in the Properties panel.
 - Type-specific property fields in Properties panel (see §4).
 - Per-type display colours:
@@ -335,6 +342,7 @@ To represent movement between eye points:
 | Wall | Yellow `#E8C840` |
 | Arch | Cyan `#40C8E8` |
 | EyePath | Green `#40E880` |
+| Anchor | Blue-violet |
 
 ### 9.2 Wall Interior Side Indicator
 
@@ -367,7 +375,7 @@ The hatching approach is preferred as it is unambiguous and does not clutter the
 
 - Global snap grid size: `snap_grid` (default 0.25 world units) from level metadata.
 - Toggle: `G` key or a toolbar button.
-- Applied in Draw Polyline and Select (vertex drag) modes.
+- Applied in Draw Wall / Draw EyePath and Select (vertex drag) modes.
 - Small grid keeps paths natural-looking; not enforced for Arch position placement.
 
 ### 9.7 Texture Interval Editor
@@ -390,12 +398,14 @@ The following changes are planned for level file version 2:
     "author": "str",
     "wall_height": 4.0,
     "eye_height": 1.7,
-    "fov_h": 90.0,
+    "fov_h": 91.5,
     "fov_v": 60.0,
-    "texture_pixel_size": 0.01,
+    "pixels_per_meter": 256.0,
     "fog_start": 20.0,
     "fog_end": 40.0,
     "snap_grid": 0.25,
+    "render_width": 1024,
+    "render_height": 576,
     "floor_texture": "str | null",
     "ceiling_texture": "str | null"
   },

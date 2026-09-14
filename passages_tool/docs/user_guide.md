@@ -1,6 +1,7 @@
 # Passages Level Editor — User's Guide
 
-> **Version 1.0** · Tool located at `_local/tools/passages_tool/`
+> Tool located at `_local/tools/passages_tool/` (GitHub: `arctree_tools/passages_tool`).
+> File format **version 2**. Vertical FOV + render size are authored; horizontal FOV is derived.
 
 ---
 
@@ -8,30 +9,34 @@
 
 1. [Overview](#1-overview)
 2. [Installation & Launch](#2-installation--launch)
-3. [Interface Layout](#3-interface-layout)
-4. [Viewport Navigation](#4-viewport-navigation)
-5. [Tool Modes](#5-tool-modes)
-6. [Working with Polylines](#6-working-with-polylines)
-7. [Texture Palette](#7-texture-palette)
-8. [Properties Panel](#8-properties-panel)
-9. [File Operations](#9-file-operations)
-10. [Keyboard & Mouse Reference](#10-keyboard--mouse-reference)
-11. [Level File Format](#11-level-file-format)
-12. [Troubleshooting](#12-troubleshooting)
+3. [From empty window to baked frames](#3-from-empty-window-to-baked-frames)
+4. [Interface Layout](#4-interface-layout)
+5. [Viewport Navigation](#5-viewport-navigation)
+6. [Tool Modes](#6-tool-modes)
+7. [Working with Geometry](#7-working-with-geometry)
+8. [Texture Palette](#8-texture-palette)
+9. [Properties Panel](#9-properties-panel)
+10. [Validate](#10-validate)
+11. [File Operations](#11-file-operations)
+12. [Keyboard & Mouse Reference](#12-keyboard--mouse-reference)
+13. [Level File Format](#13-level-file-format)
+14. [Convert, bake, and ship](#14-convert-bake-and-ship)
+15. [Troubleshooting](#15-troubleshooting)
 
 ---
 
 ## 1. Overview
 
-The **Passages Level Editor** is a standalone 2D editor for designing level geometry used by the *Passages* minigame. It lets you:
+The **Passages Level Editor** is a standalone 2D editor for level geometry used by the *Passages* minigame. It lets you:
 
-- Draw and edit **polylines** — the primary level geometry primitive
-- Assign **textures** to polylines from a browsable palette
-- Pan and zoom a grid-backed **orthographic viewport**
-- Save and load levels as human-readable **JSON files**
-- Undo and redo any edit
+- Draw **Walls**, **Arches**, **EyePaths**, and **Anchors**
+- Assign textures from a browsable palette (including per-wall intervals)
+- Pan and zoom a grid-backed orthographic viewport
+- Preview a 3D viewpoint from a selected EyePath edge
+- Save and load levels as `.passages.json` (version 2)
+- Undo and redo edits
 
-The tool runs as a desktop Panda3D application with a Dear ImGui overlay for all panels and menus.
+The tool is a desktop Panda3D application with a Dear ImGui overlay. Baking still frames for the game is a separate CLI (`bake.bat` / `python -m passages_tool.renderer`); there is no File → Bake command in the editor yet.
 
 ---
 
@@ -41,342 +46,340 @@ The tool runs as a desktop Panda3D application with a Dear ImGui overlay for all
 
 | Requirement | Version |
 |---|---|
-| Python | 3.10 or higher (Miniconda 3.12 confirmed working) |
+| Python | 3.10 or higher |
 | Panda3D | 1.10.16 (installed automatically) |
 | panda3d-imgui | 1.2.0 (installed automatically) |
 
-### First Run
+### First run
 
-Double-click `run.bat` in the `passages_tool/` folder. On the first run it will:
+Double-click `run.bat` in the `passages_tool/` folder (or run it from any working directory — it `cd`s to its own folder). On the first run it will:
 
 1. Create a `.venv/` virtual environment
-2. Install all dependencies from PyPI (~80 MB download)
-3. Launch the editor window
+2. Install dependencies from PyPI
+3. Launch the editor
 
-Subsequent launches skip steps 1–2 and open immediately.
+Subsequent launches skip install and open immediately.
+
+Image assets are not in git. Before the palette or baker can find sample textures:
+
+```bat
+cd _local\tools\passages_tool
+tar -xf sample_assets.tar
+```
+
+On first launch the editor auto-scans `assets/sample_textures/` if that folder exists. After you **Browse folder…**, the last path is remembered in `editor_state.json` (gitignored).
+
+### Running from a terminal
 
 ```bat
 cd _local\tools\passages_tool
 run.bat
 ```
 
-### Running from a terminal
+or, with the venv already created:
 
 ```bat
-cd _local\tools\passages_tool
 .venv\Scripts\python.exe -m passages_tool.main
 ```
 
-### Running from VSCode
+### Running from VS Code
 
-Open `_local/tools/passages_tool/` as the workspace root. VSCode will automatically activate `.venv` in its integrated terminal (configured via `.vscode/settings.json`). Use the **Run** button or press `F5`.
-
-> [!IMPORTANT]
-> If VSCode shows import errors, select the correct interpreter: `Ctrl+Shift+P` → **Python: Select Interpreter** → choose `.venv\Scripts\python.exe`.
+Open `passages_tool/` as the workspace root. Select interpreter `.venv\Scripts\python.exe` (`Ctrl+Shift+P` → **Python: Select Interpreter**).
 
 ---
 
-## 3. Interface Layout
+## 3. From empty window to baked frames
+
+1. Launch with `run.bat`. Confirm the Textures panel lists sample PNGs (extract `sample_assets.tar` if it is empty).
+2. **File → Open…** a sample such as `json/verify.passages.json`, or draw your own (Wall `W`, EyePath `E`, Arch `A`, Anchor `R`).
+3. Toggle **Snap** (`G`) if you want vertices on the visible grid. Grid spacing is `snap_grid` in Level Properties (default 0.25 m).
+4. Press **Validate** (`V`). Fix untextured walls, missing floor/ceiling, extra EyePaths, and edge-on arches. Use **Select** on a warning to frame that polyline.
+5. Select an EyePath, pick a directed edge, click **Render Preview** in Properties to confirm the 3D view.
+6. **File → Save** (`.passages.json`).
+7. From the tool folder:
+
+```bat
+bake.bat verify
+```
+
+That writes `scene_out/` (component `.egg` files) and `renders_out/` (PNG viewpoints, midpoints, `manifest.json`). Optional shipping step:
+
+```bat
+.venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
+```
+
+Drop `basisu.exe` in `bin/` if you want KTX2; otherwise JPEG/PNG fallbacks are written.
+
+---
+
+## 4. Interface Layout
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  File  Edit  │  Tool: [ Select ]  [ Draw Polyline ]                         │  ← Menu bar
-├───────────┬─────────────────────────────────────────────────────┬───────────┤
-│           │                                                     │           │
-│ Textures  │                                                     │Properties │
-│           │              Viewport                               │           │
-│ [thumb]   │         (pan, zoom, draw, select)                   │ Polyline  │
-│ [thumb]   │                                                     │ ID: …     │
-│ [thumb]   │                                                     │ Vertices  │
-│           │                                                     │ Texture   │
-│  detail   │                                                     │           │
-│           │                                                     │           │
-└───────────┴─────────────────────────────────────────────────────┴───────────┘
+┌──────────────────────────────────────────────────────────────────────────────┐
+│ File  Edit │ Select  Draw Wall  Place Arch  Draw EyePath  Place Anchor │ Snap │ Validate │ fps │
+├────────────┬─────────────────────────────────────────────────┬───────────────┤
+│ Textures   │                                                 │ Properties    │
+│ [Browse…]  │              Viewport                           │ type-specific │
+│ [thumbs]   │         (pan, zoom, draw, select)               │ vertices      │
+│  detail    │                                                 │ level meta    │
+└────────────┴─────────────────────────────────────────────────┴───────────────┘
 ```
 
 | Region | Description |
 |---|---|
-| **Menu bar** | File / Edit menus and in-line tool mode buttons |
-| **Textures panel** (left) | Browse and select texture files; shows thumbnail grid and detail view |
-| **Viewport** (centre) | Main editing canvas — the level geometry is drawn here |
-| **Properties panel** (right) | Inspect and edit the selected polyline: vertices, texture, closed flag |
+| **Menu bar** | File / Edit, tool modes (colour-coded), snap toggle, Validate, FPS |
+| **Textures** (left) | Recursive thumbnail browser |
+| **Viewport** (centre) | XZ plan of the level |
+| **Properties** (right) | Selected polyline, plus level-wide meta when nothing (or anything) is selected |
+
+Window title: `Passages Level Editor — <filename> *` (`*` = unsaved).
 
 ---
 
-## 4. Viewport Navigation
+## 5. Viewport Navigation
 
-The viewport uses an **orthographic camera** looking straight down the Y axis. All editing happens in the XZ plane.
+Orthographic camera looking along +Y. Editing is in the **XZ plane**.
 
 | Action | Input |
 |---|---|
-| **Pan** | Hold **middle mouse button** and drag |
-| **Zoom in** | **Scroll wheel up** |
-| **Zoom out** | **Scroll wheel down** |
+| **Pan** | Hold **middle mouse** and drag |
+| **Zoom in / out** | **Scroll wheel** |
+| **Fit on open** | File → Open zooms to the level bounds |
 
-The background grid updates automatically as you zoom. Minor grid lines are drawn every **1 world unit**; major lines every **8 world units**.
+The background grid matches **snap spacing** (`meta.snap_grid`). Minor lines = snap; major lines every 8 minors. If snap is tiny, the drawer thins the lines so the view does not fill with ink.
 
-> [!TIP]
-> When a level is opened via **File → Open**, the viewport automatically zooms to fit the entire level.
+Letter shortcuts (`S` `W` `A` `E` `R` `G` `V`) and Delete are ignored while a text field in ImGui has focus. Ctrl+S still saves.
 
 ---
 
-## 5. Tool Modes
-
-Switch modes with the buttons in the menu bar, or use keyboard shortcuts:
+## 6. Tool Modes
 
 | Mode | Shortcut | Description |
 |---|---|---|
-| **Select** | `S` | Click to select a polyline; drag vertex handles to move them |
-| **Draw Polyline** | `P` | Left-click on the viewport to add vertices one at a time |
+| **Select** | `S` | Click a vertex handle to select and drag; click a wall/eyepath segment to select; click empty space to deselect |
+| **Draw Wall** | `W` | Left-click adds vertices; Enter or right-click finishes and auto-selects |
+| **Place Arch** | `A` | One left-click places an arch and selects it |
+| **Draw EyePath** | `E` | Left-click adds viewpoint vertices (consecutive edges are added as you draw); Enter or right-click finishes |
+| **Place Anchor** | `R` | One left-click places an interaction slot and selects it |
 
-The active mode button is highlighted green in the menu bar.
-
----
-
-## 6. Working with Polylines
-
-### Drawing a new polyline
-
-1. Press `P` (or click **[ Draw Polyline ]**) to enter Draw mode.
-2. **Left-click** anywhere in the viewport to place the first vertex.
-   - A new polyline is created automatically on the first click.
-3. Continue clicking to add more vertices.
-4. Press **Enter** or **Right-click** to finish the current polyline.
-   - You can immediately start drawing a new one by clicking again.
-
-### Selecting a polyline
-
-1. Press `S` (or click **[ Select ]**) to enter Select mode.
-2. **Left-click** near a vertex handle (small white circle) to select its polyline.
-3. The selected polyline turns **green**; unselected polylines are yellow.
-4. Click empty space to deselect.
-
-### Moving a vertex
-
-Select the polyline, then type new coordinates directly in the **Properties panel** (see §8). Moved vertices are reflected immediately in the viewport.
-
-### Deleting a vertex
-
-In the Properties panel, click the **X** button next to any vertex row.
-
-### Deleting a polyline
-
-- Select the polyline, then press the **Delete** key.
-- Or click **"Delete polyline"** in the Properties panel.
-
-### Closing a polyline
-
-Tick the **Closed** checkbox in the Properties panel. A closed polyline draws a final segment from its last vertex back to its first.
+The active tool is tinted in its type colour (wall yellow, arch cyan, eyepath green, anchor blue-violet).
 
 ---
 
-## 7. Texture Palette
+## 7. Working with Geometry
 
-The **Textures** panel on the left manages the texture library.
+Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior is the **right-hand** side when walking vertices in creation order). **Arch** cyan. **EyePath** spring green with arrowheads. **Anchor** blue-violet (not red — red is the Validate highlight).
 
-### Loading textures
+### Walls
 
-1. Click **Browse folder…**
-2. Select a folder containing image files (`.png`, `.jpg`, etc.).
-3. Thumbnails appear in the panel.
+1. `W`, left-click vertices, Enter/RMB to finish.
+2. Closed walls: tick **Closed** in Properties (closing edge is textured by an interval that reaches the last vertex).
+3. Texture with **intervals** (from-vertex → to-vertex, texture, x-offset). Overlapping intervals are rejected.
+4. **Ins** on a vertex row inserts a midpoint after that vertex.
 
-### Selecting a texture
+### Arches
 
-Click any thumbnail. The selected texture is highlighted green and its full-size preview appears below the thumbnail grid.
+One click. If you place near a wall, the tool offers a perpendicular snap: **Enter** accepts, **Esc** or another click / tool switch keeps **billboard**.
 
-### Assigning a texture to a polyline
+### EyePaths
 
-1. Select a texture in the palette.
-2. Select a polyline in the viewport.
-3. In the Properties panel, click **"Assign: \<texture name\>"**.
+Vertices are standing points. Directed **edges** are the baked views (`v_from` looking at `v_to`). Drawing consecutive vertices adds those edges automatically. Insert-vertex **splits** the spanned edge (and the reverse if present).
 
-### Clearing a texture assignment
+Bake and preview use the **first** EyePath only. Validate warns if there is more than one.
 
-Click **"Clear"** next to the texture name in the Properties panel.
+### Anchors
 
----
+Sprite slots for the runtime. They are not meshed into `.egg`. Visibility occlusion is baked per eyepoint; FOV culling is done in the game.
 
-## 8. Properties Panel
+### Select, move, delete
 
-The Properties panel shows details for the currently selected polyline.
+- **Select:** click a handle (~12 px) or a segment.
+- **Move vertex:** left-drag the handle (snap applies if Snap is on). You can also type X/Z in Properties.
+- **Delete vertex:** **X** on that row in Properties.
+- **Delete polyline:** `Delete` key or **Delete polyline** (ignored while typing in a field).
+- **Change type:** the type combo asks for confirmation and drops fields the new type does not use.
 
-| Field | Description |
-|---|---|
-| **ID** | Auto-generated UUID (first 16 characters shown) |
-| **Vertices** | Count of vertices in this polyline |
-| **Closed** | Checkbox — draws a closing segment back to vertex 0 |
-| **Texture** | Currently assigned texture filename, or *(none)* |
-| **Assign** button | Assigns the palette selection to this polyline |
-| **Clear** button | Removes the texture assignment |
-| **Vertex list** | Editable X/Z coordinate fields; **X** button deletes that vertex |
-| **Delete polyline** | Permanently removes this polyline (undoable) |
-
-> [!NOTE]
-> Coordinates are in **world units**. The grid cell size is 1.0 world unit by default.
+Undo coalesces a slider/drag into one step. The first click of a new wall is one undo step, not two.
 
 ---
 
-## 9. File Operations
+## 8. Texture Palette
 
-### Menu bar shortcuts
+1. First launch scans `assets/sample_textures/` (including subfolders). **Browse folder…** to pick another; the path is remembered.
+2. Click a thumbnail to select it.
+3. Assign from Properties: wall **interval** Assign, arch texture Assign, or Level **Floor / Ceiling** Assign.
+
+Names are paths relative to the folder (`base/brick.png` if nested).
+
+---
+
+## 9. Properties Panel
+
+### Level (always available)
+
+Name, author, wall height, eye height, **FOV vertical** (horizontal is shown read-only: derived from VFOV × `render_width`/`render_height`), fog, snap grid, bake resolution, floor/ceiling textures.
+
+Default bake size is **1024×576** (16:9). At 60° VFOV that yields about **91.5°** HFOV. Changing resolution or VFOV rewrites `fov_h` on save so the game client stays aligned with the baker.
+
+### Wall
+
+Closed flag; texture intervals (assign, x-offset, split, remove, add); vertex list.
+
+### Arch
+
+Position; billboard vs angle; auto-snap to walls; width / height override; texture; transparency (`none` / `alpha_test` / `alpha_blend`); z-offset; v-at-floor; optional point light.
+
+### EyePath
+
+Directed edge list (add/remove by vertex index); **Render Preview** for an edge; vertex list.
+
+### Anchor
+
+Position, radius, height, z-offset, tags.
+
+---
+
+## 10. Validate
+
+**Validate** on the menu bar or `V`. Checks:
+
+- Untextured wall edges (including the closing edge of a closed wall), missing floor/ceiling
+- Overlapping texture intervals
+- Fixed arches that are edge-on from an EyePath view (within fog)
+- More than one EyePath (bake uses only the first)
+
+Flagged polylines turn red. Click **Select** on a warning to frame that object. Floor/ceiling warnings have no polyline to jump to.
+
+---
+
+## 11. File Operations
 
 | Action | Menu | Keyboard |
 |---|---|---|
-| New level | File → New | `Ctrl+N` |
-| Open level | File → Open… | `Ctrl+O` |
-| Save level | File → Save | `Ctrl+S` |
-| Exit | File → Exit | `Alt+F4` |
+| New | File → New | `Ctrl+N` |
+| Open | File → Open… | `Ctrl+O` |
+| Save | File → Save | `Ctrl+S` |
+| Save As | File → Save As… | `Ctrl+Shift+S` |
+| Exit | File → Exit | window close / Alt+F4 |
 | Undo | Edit → Undo | `Ctrl+Z` |
 | Redo | Edit → Redo | `Ctrl+Y` |
 
-- The title bar shows **"Save \*"** when there are unsaved changes.
-- Opening or creating a new level with unsaved changes will prompt for confirmation.
-- Files are saved with the `.passages.json` extension, added automatically if omitted.
+New, Open, Exit, and the window **X** prompt if the document is dirty. Files use the `.passages.json` extension (added if omitted). v1 files migrate in memory on load; save to write v2. A `version` newer than 2 is refused.
 
 ---
 
-## 10. Keyboard & Mouse Reference
+## 12. Keyboard & Mouse Reference
 
 ### Keyboard
 
 | Key | Action |
 |---|---|
-| `S` | Switch to Select tool |
-| `P` | Switch to Draw Polyline tool |
-| `Enter` | Finish current polyline (Draw mode) |
+| `S` | Select |
+| `W` | Draw Wall |
+| `A` | Place Arch |
+| `E` | Draw EyePath |
+| `R` | Place Anchor |
+| `G` | Toggle snap |
+| `V` | Validate |
+| `Enter` | Finish wall/eyepath, or accept arch snap |
+| `Esc` | Keep billboard on arch snap |
 | `Delete` | Delete selected polyline |
-| `Ctrl+Z` | Undo |
-| `Ctrl+Y` | Redo |
-| `Ctrl+S` | Save |
-| `Ctrl+O` | Open |
-| `Ctrl+N` | New |
+| `Ctrl+Z` / `Ctrl+Y` | Undo / Redo |
+| `Ctrl+S` / `Ctrl+Shift+S` | Save / Save As |
+| `Ctrl+O` / `Ctrl+N` | Open / New |
 
 ### Mouse
 
-| Button / Wheel | Action |
+| Input | Action |
 |---|---|
-| **Left click** | Place vertex (Draw) / Select polyline (Select) |
-| **Middle drag** | Pan viewport |
-| **Scroll up** | Zoom in |
-| **Scroll down** | Zoom out |
-| **Right click** | Finish current polyline (Draw mode) |
-
-> [!NOTE]
-> When the mouse is over an ImGui panel (palette, properties, menu bar), viewport interactions are automatically suppressed so clicks do not accidentally place or select geometry.
+| Left click (draw) | Place vertex or arch/anchor |
+| Left click (select) | Select handle or segment |
+| Left drag (select) | Move vertex |
+| Middle drag | Pan |
+| Scroll | Zoom (not over ImGui panels) |
+| Right click | Finish wall/eyepath |
 
 ---
 
-## 11. Level File Format
+## 13. Level File Format
 
-Levels are saved as `.passages.json` files — plain UTF-8 JSON.
+UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 
-```json
-{
-  "version": 1,
-  "meta": {
-    "name": "My Level",
-    "author": ""
-  },
-  "grid": {
-    "cell_size": 1.0
-  },
-  "tiles": [
-    { "x": 0, "y": 0, "texture": "grass.png" }
-  ],
-  "polylines": [
-    {
-      "id": "3f8a2b1c-…",
-      "vertices": [[0.0, 0.0], [5.0, 0.0], [5.0, 3.0]],
-      "texture": "wall.png",
-      "closed": false
-    }
-  ]
-}
+| Field | Notes |
+|---|---|
+| `meta.fov_v`, `render_width`, `render_height` | Authored. `fov_h` is derived and rewritten on load/save |
+| `meta.pixels_per_meter` | Texture scale (legacy `texture_pixel_size` migrates) |
+| `meta.snap_grid` | Editor snap and visual grid |
+| `grid.cell_size` | Serialized leftover; the viewport does not use it |
+| `tiles` | Reserved; no editor or baker |
+| `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
+| Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
+| EyePath `edges` | Directed `[from, to]` pairs |
+
+---
+
+## 14. Convert, bake, and ship
+
+From the tool directory (venv created by `run.bat`):
+
+```bat
+REM Geometry only (includes combined scene.egg for pview)
+.venv\Scripts\python.exe -m passages_tool.converter json\verify.passages.json scene_out --textures assets\sample_textures
+
+REM Viewpoints + midpoints + manifest (no combined scene.egg)
+bake.bat verify
+
+REM Optional KTX2 / JPEG
+.venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
 ```
 
-| Field | Type | Description |
-|---|---|---|
-| `version` | integer | Format version (currently `1`) |
-| `meta.name` | string | Human-readable level name |
-| `meta.author` | string | Author name (optional) |
-| `grid.cell_size` | float | World units per grid cell |
-| `tiles` | array | Tile-based layer (reserved for future use) |
-| `tiles[].x / .y` | integer | Tile grid coordinates |
-| `tiles[].texture` | string \| null | Texture filename |
-| `polylines` | array | All polylines in the level |
-| `polylines[].id` | string | UUID, stable across saves |
-| `polylines[].vertices` | `[[x,z],…]` | Ordered vertex list in world coords |
-| `polylines[].texture` | string \| null | Assigned texture filename |
-| `polylines[].closed` | boolean | If `true`, last vertex connects back to first |
-
-> [!IMPORTANT]
-> If you open a file whose `version` field is higher than the tool supports (currently `1`), the tool will refuse to open it and display an error. Always use the same tool version that created the file, or manually downgrade the version field at your own risk.
+Bake uses the first EyePath. Midpoint frames are the geometric 50% of each undirected edge. Floor triangulation treats the largest closed wall as the outer loop and other closed walls as holes — two separate rooms will not each get a floor.
 
 ---
 
-## 12. Troubleshooting
+## 15. Troubleshooting
 
-### Window opens but no ImGui panels are visible
-
-The `p3dimgui` (panda3d-imgui) package failed to load. In the terminal:
+### Window opens but no ImGui panels
 
 ```bat
 .venv\Scripts\python.exe -c "import p3dimgui; print('OK')"
 ```
 
-If this fails, reinstall:
-
-```bat
-.venv\Scripts\python.exe -m pip install panda3d-imgui
-```
-
----
-
-### `AttributeError: 'NodePath' has no attribute 'setBackgroundColor'`
-
-Outdated code from before commit `66bb9ec`. Pull the latest version and retry.
-
----
+If that fails: `.venv\Scripts\python.exe -m pip install panda3d-imgui`
 
 ### `ModuleNotFoundError: No module named 'p3dimgui'`
 
-The venv was created with a broken pip shim (a Miniconda quirk). Fix:
+Broken Conda pip shim. Delete `.venv` and run `run.bat` again, or:
 
 ```bat
-REM Delete and recreate the venv
 rmdir /s /q .venv
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install --upgrade pip
 .venv\Scripts\python.exe -m pip install -e .[dev]
 ```
 
----
-
 ### `Read timed out` during pip install
-
-PyPI download timed out. Retry with a larger timeout:
 
 ```bat
 .venv\Scripts\python.exe -m pip install panda3d-imgui --timeout 120 --retries 5
 ```
 
----
-
-### VSCode uses the wrong Python / shows import errors
-
-1. Open the `passages_tool/` folder as the **workspace root** (`File → Open Folder`).
-2. `Ctrl+Shift+P` → **Python: Select Interpreter** → pick `.venv\Scripts\python.exe`.
-
-The `.vscode/settings.json` file locks this setting for the workspace permanently.
-
----
-
 ### Scrolling does not zoom
 
-If the mouse is hovering over a panel (palette or properties), scroll events are captured by ImGui rather than the viewport. Move the mouse over the viewport background before scrolling.
+Mouse is over a panel. Move it over the viewport.
 
----
+### Letter keys change tools while typing
 
-### Level file from a newer version of the tool
+They should not. If a field is focused, `S`/`W`/… are ignored. Click the viewport if a shortcut seems dead.
 
-The error *"Level version N is newer than this tool"* means the file was created by a future version. You will need to either update the tool or manually edit the `"version"` field back to `1` in a text editor (only if you are certain the format is compatible).
+### Validate flags every closed wall as untextured
+
+You are on a build older than the shared closing-edge helper. Update the tool.
+
+### Level version newer than this tool
+
+The file’s `"version"` is greater than 2. Update the tool, or only downgrade the field if you know the JSON is compatible.
+
+### Sprites do not line up with baked backgrounds
+
+`fov_h` in an old JSON may not match the baker (which always uses VFOV × aspect). Re-save the level in this editor so `fov_h` is rewritten, then re-bake if you also changed resolution or VFOV.

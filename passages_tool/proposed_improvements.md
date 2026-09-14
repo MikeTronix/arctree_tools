@@ -20,11 +20,11 @@ Status: **done** · **partial** · **open**
 |---|---|---|
 | §2 P0 correctness / data-loss | **done** | Nested `b9011b6`; GitHub `6ed69e8` |
 | §3 P1 editor interaction | **done** (3.13 typed issues still **partial**) | Nested `f07a0e3`; GitHub `b9f5b0a` |
-| §4 P1 bake / converter | **partial** | Core plumbing done; 4.3 and 4.8 left as forks; 4.2/4.9 docs leftover |
+| §4 P1 bake / converter | **partial** | Core plumbing done; 4.3 and 4.8 left as forks; 4.2 combined `scene.egg` still a second CLI pass |
 | §5 P2 architecture | **open** | `Level.eyepaths()` landed as a side effect of 4.1 |
-| §6 Docs / onboarding | **open** | User guide and README still describe v1 / `P` / no vertex drag |
+| §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat` cds to its folder; rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
-| §8 Feature opportunities | **open** | After remaining P1 forks and docs |
+| §8 Feature opportunities | **open** | After remaining P1 forks |
 
 Tests at last P1 commit: **167 passed**.
 
@@ -202,9 +202,9 @@ Add is rejected; Validate warns. A v2 file that already contains overlaps still 
 
 `build_triangulated_polygons` docstring states the limitation. Two disjoint closed rooms still punch a hole in the larger one. Remaining: per-loop floors or a union. Do not “fix” silently — it changes every multi-room bake.
 
-### 4.9 CLI help / defaults disagree — **partial**
+### 4.9 CLI help / defaults disagree — **done**
 
-Baker `--height` help now says typically 576. Config default is still 576 / derived ~91.5 HFOV. README sample JSON and `docs/passages_rendering_design.md` still show 768 / 90. Remaining is a docs pass (§6), not another code default.
+Config, baker `--height` help, README sample, user guide, and rendering-design tables all use **1024×576** and derived HFOV (~91.5° at 60° V). Older on-disk sample levels may still say 768/90 until re-saved.
 
 ---
 
@@ -242,20 +242,17 @@ Near/far/headlight now share config, but the two methods are still duplicated. A
 
 ---
 
-## 6. Docs and onboarding — **open**
+## 6. Docs and onboarding — **done** (Bake-from-editor leftover)
 
-Highest remaining mismatch. Vertex drag (3.1) is implemented; the table below is still what the docs say.
-
-| User guide / README | Code now |
+| Item | Shipped |
 |---|---|
-| Draw Polyline, shortcut `P` | Wall `W`, Arch `A`, EyePath `E`, Anchor `R` |
-| Format version 1, single `texture` | Version 2, intervals, arches, eyepaths, anchors |
-| “Newer than version 1 will refuse” | `LEVEL_FILE_VERSION = 2` |
-| Vertex drag in the viewport | **Implemented** (3.1) — docs still useful if updated |
-| Properties: closed + texture + vertex list | Intervals, lights, edges, preview, derived FOV Horiz |
-| README sample `render_height` 768 / `fov_h` 90 | Config 576; `fov_h` derived |
+| User guide matches W/A/E/R, v2, drag, derived FOV, Validate, Save As | `docs/user_guide.md` rewritten |
+| README controls + sample 1024×576 / derived `fov_h` ≈ 91.5 | `README.md` |
+| Empty-window → `renders_out/` walkthrough | README § and user guide §3 |
+| `run.bat` `cd /d "%~dp0"` | Matches `bake.bat` |
+| Rendering design status + FOV / types / floor / anchors / manifest | `docs/passages_rendering_design.md` banner + tables |
 
-Also still missing: File → Bake Level…; `run.bat` `cd /d %~dp0`; a one-page empty-window-to-`renders_out/` README; rendering-design tables (anchors, N-slice, v2 manifest).
+**Still not a docs issue:** File → Bake Level… is an editor feature (§8.1), not a documentation gap. `bake.bat` is documented.
 
 ---
 
@@ -306,15 +303,14 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 
 ## 9. Remaining order of work
 
-P0 and core P1 are done. Next, if continuing this list:
+P0, core P1, and the docs pass are done. Next, if continuing this list:
 
-1. **Docs pass** (§6) — user guide, README shortcuts, sample `fov_h`/`render_height`, `run.bat` cd. Highest user-facing leftover.
-2. **Decide 4.3** — keep geometric midpoints (current) or cap travel with a shared `arch_view_angle()`. Content-visible.
-3. **Decide 4.8** — keep largest-loop+holes (documented) or per-room floors. Content-visible.
-4. **Small leftovers** — typed Validate issues (3.13), `from_dict` overlap error (4.7), chain KTX2 in `bake.bat` (4.4), `grid.cell_size` (3.3), `walls()`/`anchors()` (5.3).
-5. **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles.
+1. **Decide 4.3** — keep geometric midpoints (current) or cap travel with a shared `arch_view_angle()`. Content-visible.
+2. **Decide 4.8** — keep largest-loop+holes (documented) or per-room floors. Content-visible.
+3. **Small leftovers** — typed Validate issues (3.13), `from_dict` overlap error (4.7), chain KTX2 in `bake.bat` (4.4), `grid.cell_size` (3.3), `walls()`/`anchors()` (5.3).
+4. **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles.
 
-Do not start 2 or 3 without an explicit product choice.
+Do not start items 1 or 2 without an explicit product choice.
 
 ---
 
