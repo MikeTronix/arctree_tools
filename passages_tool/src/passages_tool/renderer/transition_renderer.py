@@ -49,10 +49,14 @@ def compute_transition_path(
     Distance is capped to keep all fixed arches within range comfortably face-on.
     Returns a list of (x, y, heading_deg) tuples.
     """
-    p_from = level.eyepath_vertex(v_from)
-    p_to = level.eyepath_vertex(v_to)
-    if p_from is None or p_to is None:
+    paths = level.eyepaths()
+    eyepath_pl = paths[0] if paths else None
+
+    if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
         return []
+
+    p_from = eyepath_pl.vertices[v_from]
+    p_to = eyepath_pl.vertices[v_to]
 
     dx = p_to[0] - p_from[0]
     dy = p_to[1] - p_from[1]

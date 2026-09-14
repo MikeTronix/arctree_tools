@@ -70,7 +70,7 @@ Migration
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterator, Optional
+from typing import Optional
 
 from passages_tool import config
 from passages_tool.editor.polyline_data import (
@@ -187,42 +187,6 @@ class Level:
 
     def arches(self) -> list[Arch]:
         return [pl for pl in self.polylines.values() if isinstance(pl, Arch)]
-
-    def eyepath_offset(self, path_id: str) -> int:
-        """Global vertex index of local 0 on this EyePath (sum of earlier paths)."""
-        offset = 0
-        for pl in self.eyepaths():
-            if pl.id == path_id:
-                return offset
-            offset += len(pl.vertices)
-        return 0
-
-    def eyepath_vertex(self, global_index: int) -> Optional[tuple[float, float]]:
-        """Look up a vertex across every EyePath using the bake/client global index."""
-        n = 0
-        for pl in self.eyepaths():
-            if global_index < n + len(pl.vertices):
-                return pl.vertices[global_index - n]
-            n += len(pl.vertices)
-        return None
-
-    def iter_eyepath_directed_edges(
-        self,
-    ) -> Iterator[tuple[int, int, tuple[float, float], tuple[float, float]]]:
-        """Yield (g_from, g_to, p_from, p_to) for both directions of every EyePath edge."""
-        offset = 0
-        seen: set[tuple[int, int]] = set()
-        for pl in self.eyepaths():
-            for a, b in pl.edges:
-                for e in ((a, b), (b, a)):
-                    g = (e[0] + offset, e[1] + offset)
-                    if g in seen:
-                        continue
-                    if e[0] >= len(pl.vertices) or e[1] >= len(pl.vertices):
-                        continue
-                    seen.add(g)
-                    yield g[0], g[1], pl.vertices[e[0]], pl.vertices[e[1]]
-            offset += len(pl.vertices)
 
     def add_vertex(self, polyline_id: str, x: float, z: float) -> None:
         pl = self.polylines.get(polyline_id)

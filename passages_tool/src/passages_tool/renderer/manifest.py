@@ -73,11 +73,26 @@ def build_manifest(
     }
     eye_height = level.meta.eye_height
 
-    directed = list(level.iter_eyepath_directed_edges())
-    if not directed and not any(pl.vertices for pl in level.eyepaths()):
+    paths = level.eyepaths()
+    eyepath_pl = paths[0] if paths else None
+
+    if not eyepath_pl or not eyepath_pl.vertices:
         return manifest
 
-    for v_from, v_to, p_from, p_to in directed:
+    # ── edges (bidirectional, deduped) ────────────────────────────────────────
+    directed_edges: list[tuple[int, int]] = []
+    _seen_dir: set[tuple[int, int]] = set()
+    for a, b in eyepath_pl.edges:
+        for e in ((a, b), (b, a)):
+            if e not in _seen_dir:
+                _seen_dir.add(e)
+                directed_edges.append(e)
+
+    for v_from, v_to in directed_edges:
+        if v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
+            continue
+        p_from = eyepath_pl.vertices[v_from]
+        p_to = eyepath_pl.vertices[v_to]
         key = f"v{v_from:04d}_to_v{v_to:04d}"
 
         image_name = f"render_{key}.png"
@@ -105,44 +120,41 @@ def build_manifest(
     anchors = [pl for pl in level.anchors() if pl.vertices]
     fog_end = level.meta.fog_end
 
-    global_i = 0
-    for path in level.eyepaths():
-        for vpos in path.vertices:
-            i = global_i
-            global_i += 1
-            vid = f"v{i:04d}"
-            eye = (vpos[0], vpos[1], eye_height)
-            nearest = lambda p, _eye=eye: occluders.nearest_occluder_dist(_eye, p)
-            visible: dict[str, Any] = {}
+    for i, vpos in enumerate(eyepath_pl.vertices):
+        vid = f"v{i:04d}"
+        eye = (vpos[0], vpos[1], eye_height)
+        # occlusion_coverage wants nearest_occluder_dist(sample); close over eye.
+        nearest = lambda p, _eye=eye: occluders.nearest_occluder_dist(_eye, p)
+        visible: dict[str, Any] = {}
 
-            for anchor in anchors:
-                ax, ay = anchor.vertices[0]
-                dist = ((ax - vpos[0]) ** 2 + (ay - vpos[1]) ** 2) ** 0.5
-                max_dist = min(anchor.max_distance, fog_end)
-                if dist > max_dist or dist < 0.1:
-                    continue
+        for anchor in anchors:
+            ax, ay = anchor.vertices[0]
+            dist = ((ax - vpos[0]) ** 2 + (ay - vpos[1]) ** 2) ** 0.5
+            max_dist = min(anchor.max_distance, fog_end)
+            if dist > max_dist or dist < 0.1:
+                continue
 
-                grid = sample_grid_points(
-                    eye, (ax, ay), anchor.z_offset, anchor.radius, anchor.height,
-                    n_wide=_GRID_WIDE, n_tall=_GRID_TALL,
-                )
-                cov = occlusion_coverage(eye, grid, nearest, bias=_SAMPLE_BIAS)
-                if cov < _COVERAGE_FLOOR:
-                    continue
+            grid = sample_grid_points(
+                eye, (ax, ay), anchor.z_offset, anchor.radius, anchor.height,
+                n_wide=_GRID_WIDE, n_tall=_GRID_TALL,
+            )
+            cov = occlusion_coverage(eye, grid, nearest, bias=_SAMPLE_BIAS)
+            if cov < _COVERAGE_FLOOR:
+                continue
 
-                visible[anchor.id] = {
-                    "world_xyz": [round(ax, 4), round(ay, 4), round(anchor.z_offset, 4)],
-                    "radius": round(anchor.radius, 4),
-                    "height": round(anchor.height, 4),
-                    "max_distance": round(anchor.max_distance, 4),
-                    "occ_coverage": round(cov, 3),
-                    "distance": round(dist, 3),
-                }
-
-            manifest["eyepoints"][vid] = {
-                "xyz": [vpos[0], vpos[1], eye_height],
-                "visible_anchors": visible,
+            visible[anchor.id] = {
+                "world_xyz": [round(ax, 4), round(ay, 4), round(anchor.z_offset, 4)],
+                "radius": round(anchor.radius, 4),
+                "height": round(anchor.height, 4),
+                "max_distance": round(anchor.max_distance, 4),
+                "occ_coverage": round(cov, 3),
+                "distance": round(dist, 3),
             }
+
+        manifest["eyepoints"][vid] = {
+            "xyz": [vpos[0], vpos[1], eye_height],
+            "visible_anchors": visible,
+        }
 
     return manifest
 

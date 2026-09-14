@@ -88,8 +88,8 @@ def main() -> None:
     if not manifest.get("edges"):
         paths = level.eyepaths()
         has_eyepath = bool(paths)
-        has_vertices = any(pl.vertices for pl in paths)
-        has_edges = any(pl.edges for pl in paths)
+        has_vertices = bool(paths and paths[0].vertices)
+        has_edges = bool(paths and paths[0].edges)
         if not has_eyepath:
             log.error(
                 "Error: The level file has no EyePath polyline defined. Cannot render viewpoints."
@@ -164,19 +164,23 @@ def main() -> None:
 
         # 5. Bake midpoint traversal frames
         log.info("Baking midpoint traversal frames...")
+        paths = level.eyepaths()
+        eyepath_pl = paths[0] if paths else None
+
         mid_rendered = 0
         mid_skipped = 0
         mid_failed = 0
 
-        undirected = []
-        _seen_mid: set[tuple[int, int]] = set()
-        for g_from, g_to, _pf, _pt in level.iter_eyepath_directed_edges():
-            lo, hi = (g_from, g_to) if g_from <= g_to else (g_to, g_from)
-            if (lo, hi) not in _seen_mid:
-                _seen_mid.add((lo, hi))
-                undirected.append((lo, hi))
-
-        if undirected:
+        if eyepath_pl and eyepath_pl.edges:
+            # Midpoint frames are undirected (shared by both travel directions):
+            # bake one per edge using a sorted/undirected name.
+            undirected = []
+            _seen_mid = set()
+            for a, b in eyepath_pl.edges:
+                lo, hi = (a, b) if a <= b else (b, a)
+                if (lo, hi) not in _seen_mid:
+                    _seen_mid.add((lo, hi))
+                    undirected.append((lo, hi))
             for idx, (v_from, v_to) in enumerate(undirected):
                 key = f"v{v_from:04d}_to_v{v_to:04d}"
                 dest_mid_png = output_dir / f"mid_{key}.png"

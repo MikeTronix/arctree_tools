@@ -326,7 +326,7 @@ REM Optional KTX2 / JPEG
 .venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
 ```
 
-Bake uses **every** EyePath. Vertex indices in `render_vXXXX_to_vYYYY` are global (first path starts at 0; later paths continue). Midpoint frames are the geometric 50% of each undirected edge. Each **closed** wall gets its own floor and ceiling (a room). Open walls get none. Nested or overlapping closed walls both fill — that is an authoring error, not a courtyard hole.
+Bake uses the first EyePath. Midpoint frames are the geometric 50% of each undirected edge. Each **closed** wall gets its own floor and ceiling (a room). Open walls get none. Nested or overlapping closed walls both fill — that is an authoring error, not a courtyard hole.
 
 ---
 
