@@ -106,6 +106,7 @@ class TestLevelMeta:
         assert restored.meta.pixels_per_meter == 128.0
         assert restored.meta.render_width    == 1920
         assert restored.meta.render_height   == 1080
+        assert restored.to_dict()["grid"]["cell_size"] == restored.meta.snap_grid
 
     def test_meta_missing_fields_get_defaults(self):
         """from_dict() must supply defaults for any missing meta keys."""

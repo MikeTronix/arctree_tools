@@ -170,14 +170,14 @@ def build_occluders(level: Level, texture_dir: Optional[Path] = None) -> Occlude
     tex_cache: dict = {}
     quads: list[Quad] = []
 
-    for pl in level.polylines.values():
-        if pl.type == PolylineType.WALL:
-            vs = pl.vertices
-            for ai, bi in wall_edge_index_pairs(pl):
-                a, b = vs[ai], vs[bi]
-                quads.append(Quad(a[0], a[1], b[0], b[1], 0.0, wall_h))
+    for pl in level.walls():
+        vs = pl.vertices
+        for ai, bi in wall_edge_index_pairs(pl):
+            a, b = vs[ai], vs[bi]
+            quads.append(Quad(a[0], a[1], b[0], b[1], 0.0, wall_h))
 
-        elif pl.type == PolylineType.ARCH:
+    for pl in level.polylines.values():
+        if pl.type == PolylineType.ARCH:
             if not pl.vertices:
                 continue
             if pl.orientation == "billboard":

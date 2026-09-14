@@ -88,11 +88,23 @@ REM We pass relative paths for outputs to avoid Panda3D drive/backslash issues
 
 set RENDER_ERROR=%errorlevel%
 
-popd
-
 if %RENDER_ERROR% neq 0 (
+    popd
     echo ERROR: Baking failed.
     exit /b %RENDER_ERROR%
 )
 
-echo [passages_tool] Baking completed successfully. Output populated at "%~dp0renders_out"
+echo [passages_tool] Shipping JPEG/KTX2 to shipping_out (JPEG fallback if basisu is missing)...
+"%VENV_PYTHON%" -m passages_tool.renderer.convert_to_jpeg "renders_out" "shipping_out"
+set SHIP_ERROR=%errorlevel%
+
+popd
+
+if %SHIP_ERROR% neq 0 (
+    echo ERROR: Bake succeeded but shipping convert failed. PNGs are in "%~dp0renders_out"
+    exit /b %SHIP_ERROR%
+)
+
+echo [passages_tool] Baking completed successfully.
+echo   PNGs:     "%~dp0renders_out"
+echo   Shipping: "%~dp0shipping_out"

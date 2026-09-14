@@ -41,7 +41,7 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-from passages_tool.editor.level import Level, PolylineType
+from passages_tool.editor.level import Level
 from passages_tool.renderer.occluder import build_occluders
 from passages_tool.renderer.occlusion import sample_grid_points, occlusion_coverage
 
@@ -73,11 +73,8 @@ def build_manifest(
     }
     eye_height = level.meta.eye_height
 
-    eyepath_pl = None
-    for pl in level.polylines.values():
-        if pl.type == PolylineType.EYEPATH:
-            eyepath_pl = pl
-            break
+    paths = level.eyepaths()
+    eyepath_pl = paths[0] if paths else None
 
     if not eyepath_pl or not eyepath_pl.vertices:
         return manifest
@@ -120,8 +117,7 @@ def build_manifest(
 
     # ── eyepoints: baked occlusion coverage per anchor (view-independent) ──────
     occluders = build_occluders(level, texture_dir)
-    anchors = [pl for pl in level.polylines.values()
-               if pl.type == PolylineType.ANCHOR and pl.vertices]
+    anchors = [pl for pl in level.anchors() if pl.vertices]
     fog_end = level.meta.fog_end
 
     for i, vpos in enumerate(eyepath_pl.vertices):

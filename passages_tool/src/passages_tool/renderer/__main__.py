@@ -9,7 +9,6 @@ import argparse
 import sys
 from pathlib import Path
 
-from passages_tool.editor.level import PolylineType
 from passages_tool.io.level_format import LevelIOError, load
 from passages_tool.renderer.manifest import (
     build_manifest,
@@ -84,17 +83,10 @@ def main() -> None:
     # 1. Build manifest
     manifest = build_manifest(level, output_dir, tex_dir)
     if not manifest.get("edges"):
-        has_eyepath = False
-        has_vertices = False
-        has_edges = False
-        for pl in level.polylines.values():
-            if pl.type == PolylineType.EYEPATH:
-                has_eyepath = True
-                if pl.vertices:
-                    has_vertices = True
-                if pl.edges:
-                    has_edges = True
-                break
+        paths = level.eyepaths()
+        has_eyepath = bool(paths)
+        has_vertices = bool(paths and paths[0].vertices)
+        has_edges = bool(paths and paths[0].edges)
         if not has_eyepath:
             print("Error: The level file has no EyePath polyline defined. Cannot render viewpoints.", file=sys.stderr)
         elif not has_vertices:
@@ -167,11 +159,8 @@ def main() -> None:
 
         # 5. Bake midpoint traversal frames
         print("\nBaking midpoint traversal frames...")
-        eyepath_pl = None
-        for pl in level.polylines.values():
-            if pl.type == PolylineType.EYEPATH:
-                eyepath_pl = pl
-                break
+        paths = level.eyepaths()
+        eyepath_pl = paths[0] if paths else None
 
         mid_rendered = 0
         mid_skipped = 0

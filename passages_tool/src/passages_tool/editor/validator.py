@@ -21,11 +21,17 @@ from passages_tool.editor.level import (
 
 @dataclass
 class ValidationWarning:
-    arch_id: str
-    v_from: int
-    v_to: int
-    angle_deg: float
+    kind: str
+    target_id: str
     message: str
+    v_from: int = -1
+    v_to: int = -1
+    angle_deg: float = 0.0
+
+    @property
+    def arch_id(self) -> str:
+        """Polyline id to highlight, or empty for level-meta issues."""
+        return self.target_id
 
 
 def validate_textures(level: Level) -> list[ValidationWarning]:
@@ -34,15 +40,12 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
     transparent. Checks every Wall edge (via its texture_intervals) plus the
     level floor and ceiling.
 
-    Reuses ValidationWarning: `arch_id` carries the polyline id to highlight
-    (empty for floor/ceiling, which are level-meta, not polylines).
+    Floor/ceiling warnings have empty ``target_id`` (level meta, not a polyline).
     """
     warnings: list[ValidationWarning] = []
 
     # ── Walls: every edge must be covered by an interval with a real texture ──
-    for pl in level.polylines.values():
-        if pl.type != PolylineType.WALL:
-            continue
+    for pl in level.walls():
         n = len(pl.vertices)
         if n < 2:
             continue
@@ -64,8 +67,10 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
             for b in ivs[i + 1:]:
                 if _texture_intervals_overlap(a, b):
                     warnings.append(ValidationWarning(
-                        arch_id=pl.id, v_from=a.from_vertex, v_to=a.to_vertex,
-                        angle_deg=0.0,
+                        kind="interval_overlap",
+                        target_id=pl.id,
+                        v_from=a.from_vertex,
+                        v_to=a.to_vertex,
                         message=(
                             f"Wall {pl.id[:8]}... has overlapping texture intervals "
                             f"V{a.from_vertex}–{a.to_vertex} and V{b.from_vertex}–{b.to_vertex} "
@@ -82,10 +87,10 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
             )
             warnings.append(
                 ValidationWarning(
-                    arch_id=pl.id,
+                    kind="untextured_wall",
+                    target_id=pl.id,
                     v_from=uncovered[0],
                     v_to=min(uncovered[0] + 1, n - 1),
-                    angle_deg=0.0,
                     message=msg,
                 )
             )
@@ -93,12 +98,14 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
     # ── Floor / ceiling (level meta) ─────────────────────────────────────────
     if not level.meta.floor_texture:
         warnings.append(ValidationWarning(
-            arch_id="", v_from=-1, v_to=-1, angle_deg=0.0,
+            kind="missing_floor",
+            target_id="",
             message="Floor has no texture assigned (Level Properties > floor) — it will render transparent.",
         ))
     if not level.meta.ceiling_texture:
         warnings.append(ValidationWarning(
-            arch_id="", v_from=-1, v_to=-1, angle_deg=0.0,
+            kind="missing_ceiling",
+            target_id="",
             message="Ceiling has no texture assigned (Level Properties > ceiling) — it will render transparent.",
         ))
 
@@ -113,7 +120,8 @@ def validate_structure(level: Level) -> list[ValidationWarning]:
         extras = ", ".join(pl.id[:8] + "…" for pl in paths[1:3])
         more = f" (+{len(paths) - 3} more)" if len(paths) > 3 else ""
         warnings.append(ValidationWarning(
-            arch_id=paths[1].id, v_from=-1, v_to=-1, angle_deg=0.0,
+            kind="extra_eyepath",
+            target_id=paths[1].id,
             message=(
                 f"Level has {len(paths)} EyePath polylines; bake and preview use "
                 f"only the first. Extra: {extras}{more}."
@@ -187,7 +195,8 @@ def validate_arch_visibility(
                 )
                 warnings.append(
                     ValidationWarning(
-                        arch_id=arch.id,
+                        kind="arch_edge_on",
+                        target_id=arch.id,
                         v_from=v_from,
                         v_to=v_to,
                         angle_deg=angle_deg,

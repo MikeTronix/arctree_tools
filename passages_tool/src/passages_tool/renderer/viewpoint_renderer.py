@@ -18,7 +18,7 @@ from passages_tool.config import (
     derived_fov_h,
 )
 from passages_tool.converter.scene_builder import load_scene
-from passages_tool.editor.level import Level, PolylineType
+from passages_tool.editor.level import Level
 
 
 class ViewpointRenderer:
@@ -54,11 +54,8 @@ class ViewpointRenderer:
     ) -> bool:
         """Render a single viewpoint edge to a PNG file."""
         # Find EyePath vertices
-        eyepath_pl = None
-        for pl in self.level.polylines.values():
-            if pl.type == PolylineType.EYEPATH:
-                eyepath_pl = pl
-                break
+        paths = self.level.eyepaths()
+        eyepath_pl = paths[0] if paths else None
 
         if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
             return False
@@ -134,11 +131,8 @@ class ViewpointRenderer:
         experiments; changing bake camera placement is a content-visible fork.
         """
         # Find EyePath vertices
-        eyepath_pl = None
-        for pl in self.level.polylines.values():
-            if pl.type == PolylineType.EYEPATH:
-                eyepath_pl = pl
-                break
+        paths = self.level.eyepaths()
+        eyepath_pl = paths[0] if paths else None
 
         if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
             return False

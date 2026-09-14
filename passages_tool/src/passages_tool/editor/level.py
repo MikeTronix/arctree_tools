@@ -345,13 +345,21 @@ class Polyline:
                 vertices = [tuple(v) for v in pd.get("vertices", [])],
                 closed   = pd.get("closed", False),
             )
+            kept: list[TextureInterval] = []
             for ivd in pd.get("texture_intervals", []):
-                pl.texture_intervals.append(TextureInterval(
+                iv = TextureInterval(
                     from_vertex = int(ivd["from_vertex"]),
                     to_vertex   = int(ivd["to_vertex"]),
                     texture     = ivd.get("texture"),
                     x_offset    = float(ivd.get("x_offset", 0.0)),
-                ))
+                )
+                if iv.from_vertex >= iv.to_vertex:
+                    continue
+                if any(_texture_intervals_overlap(iv, other) for other in kept):
+                    continue  # later overlaps dropped; do not refuse the file
+                kept.append(iv)
+            kept.sort(key=lambda x: x.from_vertex)
+            pl.texture_intervals = kept
 
         elif pl_type == PolylineType.ARCH:
             pos = tuple(pd.get("position", [0.0, 0.0]))
@@ -455,6 +463,12 @@ class Level:
 
     def eyepaths(self) -> list[Polyline]:
         return [pl for pl in self.polylines.values() if pl.type == PolylineType.EYEPATH]
+
+    def walls(self) -> list[Polyline]:
+        return [pl for pl in self.polylines.values() if pl.type == PolylineType.WALL]
+
+    def anchors(self) -> list[Polyline]:
+        return [pl for pl in self.polylines.values() if pl.type == PolylineType.ANCHOR]
 
     def add_vertex(self, polyline_id: str, x: float, z: float) -> None:
         pl = self.polylines.get(polyline_id)
@@ -684,7 +698,7 @@ class Level:
                 "floor_texture":      m.floor_texture,
                 "ceiling_texture":    m.ceiling_texture,
             },
-            "grid": {"cell_size": self.grid.cell_size},
+            "grid": {"cell_size": m.snap_grid},
             "tiles": [
                 {"x": t.x, "y": t.y, "texture": t.texture}
                 for t in self.tiles.values()
@@ -721,8 +735,8 @@ class Level:
         # fov_h is derived from fov_v + render aspect; ignore any stored value.
         level.sync_derived_fov_h()
 
-        grid = data.get("grid", {})
-        level.grid.cell_size = float(grid.get("cell_size", 1.0))
+        # grid.cell_size is an on-disk alias of snap_grid (viewport uses snap_grid).
+        level.grid.cell_size = m.snap_grid
 
         for td in data.get("tiles", []):
             level.set_tile(td["x"], td["y"], td.get("texture"))

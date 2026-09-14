@@ -338,3 +338,17 @@ class TestOverlapIntervals:
         level.add_texture_interval(pl.id, TextureInterval(0, 3, texture="a.png"))
         level.add_texture_interval(pl.id, TextureInterval(3, 5, texture="b.png"))
         assert len(pl.texture_intervals) == 2
+
+    def test_from_dict_drops_later_overlaps(self):
+        pl = Polyline.from_dict({
+            "id": "w",
+            "type": "wall",
+            "vertices": [[0, 0], [1, 0], [2, 0], [3, 0], [4, 0]],
+            "closed": False,
+            "texture_intervals": [
+                {"from_vertex": 0, "to_vertex": 3, "texture": "a.png"},
+                {"from_vertex": 1, "to_vertex": 4, "texture": "b.png"},
+            ],
+        })
+        assert len(pl.texture_intervals) == 1
+        assert pl.texture_intervals[0].texture == "a.png"

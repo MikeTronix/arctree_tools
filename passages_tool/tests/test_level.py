@@ -104,12 +104,13 @@ class TestSerialization:
     def test_polylines_survive_round_trip(self):
         level, pid = make_level()
         level.add_vertex(pid, 1.0, 2.5)
+        level.add_vertex(pid, 3.0, 2.5)
         level.set_polyline_texture(pid, "stone.png")
         level.set_polyline_closed(pid, True)
         restored = self._round_trip(level)
         pl = restored.get_polyline(pid)
         assert pl is not None
-        assert pl.vertices == [(1.0, 2.5)]
+        assert pl.vertices == [(1.0, 2.5), (3.0, 2.5)]
         assert pl.texture_intervals[0].texture == "stone.png"
         assert pl.closed is True
 

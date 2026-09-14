@@ -78,6 +78,8 @@ def test_validator_edge_on_fixed_arch():
     warnings = validate_arch_visibility(level, threshold_deg=30.0)
     assert len(warnings) == 1
     w = warnings[0]
+    assert w.kind == "arch_edge_on"
+    assert w.target_id == arch.id
     assert w.arch_id == arch.id
     assert w.v_from == 0
     assert w.v_to == 1

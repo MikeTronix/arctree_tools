@@ -102,13 +102,7 @@ Open `passages_tool/` as the workspace root. Select interpreter `.venv\Scripts\p
 bake.bat verify
 ```
 
-That writes `scene_out/` (component `.egg` files) and `renders_out/` (PNG viewpoints, midpoints, `manifest.json`). Optional shipping step:
-
-```bat
-.venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
-```
-
-Drop `basisu.exe` in `bin/` if you want KTX2; otherwise JPEG/PNG fallbacks are written.
+That writes `scene_out/` (component `.egg` files), `renders_out/` (PNG viewpoints, midpoints, `manifest.json`), and `shipping_out/` (JPEG/KTX2). Drop `basisu.exe` in `bin/` for KTX2; otherwise JPEG/PNG fallbacks are written.
 
 ---
 

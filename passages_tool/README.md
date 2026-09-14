@@ -84,8 +84,7 @@ This will extract the standard assets into the `assets/sample_textures/` directo
 2. `run.bat` — editor; textures load from `assets/sample_textures/` on first run.
 3. File → Open `json/verify.passages.json` (or draw Wall `W` / EyePath `E`).
 4. `V` to Validate. Save.
-5. `bake.bat verify` → `renders_out/` (PNG + `manifest.json`).
-6. Optional: `python -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out` (put `basisu.exe` in `bin/` for KTX2).
+5. `bake.bat verify` → `renders_out/` (PNG + `manifest.json`) and `shipping_out/` (JPEG/KTX2; put `basisu.exe` in `bin/` for KTX2).
 
 Full controls and properties: `docs/user_guide.md`.
 
