@@ -390,7 +390,7 @@ class TestEyePathSerialization:
         pl.vertices = [(0.0, 0.0), (1.0, 0.0)]
         level.add_polyline(pl)
         level.add_eyepath_edge(pl.id, 0, 1)
-        assert level.get_polyline(pl.id).edges == []
+        assert not hasattr(level.get_polyline(pl.id), "edges")
 
 
 # ─────────────────────────────────────────────────────────────────────────────

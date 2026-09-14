@@ -5,7 +5,13 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 from typing import Optional
 
-from passages_tool.editor.level import Level, Polyline, PolylineType, TextureInterval
+from passages_tool.editor.level import (
+    Level,
+    PolylineType,
+    TextureInterval,
+    convert_polyline_type,
+)
+from passages_tool.editor.polyline_data import EyePath
 from passages_tool.io.level_format import LevelIOError, load, save
 
 
@@ -153,8 +159,7 @@ class CommandsMixin:
         ):
             return
         self._hist()
-        convert_polyline_type(pl, new_type)
-        self._level.dirty = True
+        self._level.replace_polyline(convert_polyline_type(pl, new_type))
         self._pm.rebuild_one(pid)
 
     def _cb_set_field(self, pid: str, field: str, value) -> None:
@@ -198,7 +203,7 @@ class CommandsMixin:
             self, pid: str, v_from: int, v_to: int) -> None:
         self._hist()
         pl = self._level.get_polyline(pid)
-        if pl and pl.type == PolylineType.EYEPATH and not pl.edges:
+        if isinstance(pl, EyePath) and not pl.edges:
             n_verts = len(pl.vertices)
             if n_verts >= 2:
                 for i in range(n_verts - 1):
@@ -259,17 +264,3 @@ class CommandsMixin:
         )
 
 
-def convert_polyline_type(pl: Polyline, new_type: PolylineType) -> None:
-    """Keep compatible fields when changing a polyline's type in place."""
-    pl.type = new_type
-    if new_type in (PolylineType.ARCH, PolylineType.ANCHOR):
-        if pl.vertices:
-            pl.vertices = [pl.vertices[0]]
-        pl.texture_intervals = []
-        pl.edges = []
-        pl.closed = False
-    elif new_type == PolylineType.WALL:
-        pl.edges = []
-    elif new_type == PolylineType.EYEPATH:
-        pl.texture_intervals = []
-        pl.closed = False

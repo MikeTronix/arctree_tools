@@ -47,6 +47,29 @@ def test_build_manifest():
     assert manifest["eyepoints"]["v0000"]["xyz"] == [0.0, 0.0, 1.6]
 
 
+def test_build_manifest_two_eyepaths_uses_global_offsets():
+    """Second path continues the vertex index space so keys do not collide."""
+    level = Level()
+    a = Polyline.make_eyepath()
+    a.vertices = [(0.0, 0.0), (1.0, 0.0)]
+    a.edges = [(0, 1)]
+    b = Polyline.make_eyepath()
+    b.vertices = [(10.0, 0.0), (11.0, 0.0)]
+    b.edges = [(0, 1)]
+    level.add_polyline(a)
+    level.add_polyline(b)
+
+    edges = build_manifest(level)["edges"]
+    assert "v0000_to_v0001" in edges
+    assert "v0001_to_v0000" in edges
+    assert "v0002_to_v0003" in edges
+    assert "v0003_to_v0002" in edges
+    assert edges["v0002_to_v0003"]["eyepoint_xyz"][:2] == [10.0, 0.0]
+    assert set(build_manifest(level)["eyepoints"].keys()) == {
+        "v0000", "v0001", "v0002", "v0003",
+    }
+
+
 def test_find_stale_and_missing_images(tmp_path):
     # Dummy manifest (version 2 nested) with 2 edges
     manifest = {

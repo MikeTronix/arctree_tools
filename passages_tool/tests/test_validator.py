@@ -76,15 +76,16 @@ def test_validator_edge_on_fixed_arch():
     level.add_polyline(arch)
 
     warnings = validate_arch_visibility(level, threshold_deg=30.0)
-    assert len(warnings) == 1
-    w = warnings[0]
-    assert w.kind == "arch_edge_on"
-    assert w.target_id == arch.id
-    assert w.arch_id == arch.id
-    assert w.v_from == 0
-    assert w.v_to == 1
-    assert w.angle_deg == pytest.approx(0.0)
-    assert "edge-on" in w.message
+    # Both directed viewpoints (0→1 and 1→0) are baked; both see the arch edge-on.
+    assert len(warnings) == 2
+    pairs = {(w.v_from, w.v_to) for w in warnings}
+    assert pairs == {(0, 1), (1, 0)}
+    for w in warnings:
+        assert w.kind == "arch_edge_on"
+        assert w.target_id == arch.id
+        assert w.arch_id == arch.id
+        assert w.angle_deg == pytest.approx(0.0)
+        assert "edge-on" in w.message
 
 
 def test_validator_out_of_range_arch():
@@ -118,8 +119,7 @@ def test_validate_structure_multiple_eyepaths():
     level.add_polyline(a)
     level.add_polyline(b)
     warnings = validate_structure(level)
-    assert len(warnings) == 1
-    assert "2 EyePath" in warnings[0].message
+    assert warnings == []
 
 
 def test_validate_textures_closed_wall_full_interval():

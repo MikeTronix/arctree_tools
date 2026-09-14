@@ -69,80 +69,41 @@ Migration
 """
 from __future__ import annotations
 
-import uuid
-from dataclasses import dataclass, field
-from enum import Enum
-from typing import Optional, Union
+from dataclasses import dataclass
+from typing import Iterator, Optional
 
 from passages_tool import config
+from passages_tool.editor.polyline_data import (
+    Anchor,
+    AnyPolyline,
+    Arch,
+    EyePath,
+    Polyline,
+    PolylineType,
+    TextureInterval,
+    Wall,
+    _texture_intervals_overlap,
+    convert_polyline_type,
+    interval_edge_indices,
+    wall_edge_index_pairs,
+)
 
-
-# ── Enums ─────────────────────────────────────────────────────────────────────
-
-class PolylineType(Enum):
-    WALL    = "wall"
-    ARCH    = "arch"
-    EYEPATH = "eyepath"
-    ANCHOR  = "anchor"
-
-
-# ── Supporting data classes ───────────────────────────────────────────────────
-
-@dataclass
-class TextureInterval:
-    """
-    A contiguous range of Wall edges sharing one texture.
-
-    from_vertex and to_vertex are inclusive vertex indices.
-    The interval covers edges (from_vertex→from_vertex+1) …
-    (to_vertex-1→to_vertex), i.e. to_vertex is the LAST vertex,
-    not one past it, so there are (to_vertex - from_vertex) edges.
-
-    x_offset: horizontal pixel offset into the texture at the start
-    of this interval.  Carry-over from the previous interval is
-    applied automatically by the converter when texture is the same.
-    """
-    from_vertex: int
-    to_vertex:   int
-    texture:     Optional[str] = None
-    x_offset:    float = 0.0
-
-
-def wall_edge_index_pairs(pl: "Polyline") -> list[tuple[int, int]]:
-    """Vertex-index pairs for each wall segment, including the closing edge."""
-    n = len(pl.vertices)
-    if n < 2:
-        return []
-    pairs = [(i, i + 1) for i in range(n - 1)]
-    if pl.closed and n >= 3:
-        pairs.append((n - 1, 0))
-    return pairs
-
-
-def _texture_intervals_overlap(a: TextureInterval, b: TextureInterval) -> bool:
-    """True if two wall intervals cover a shared edge ([from, to) in vertex space)."""
-    return a.from_vertex < b.to_vertex and b.from_vertex < a.to_vertex
-
-
-def interval_edge_indices(pl: "Polyline", iv: TextureInterval) -> list[int]:
-    """Edge indices covered by a texture interval.
-
-    Matches converter/wall_builder: edges ``from … to-1``, plus the closing
-    edge ``n-1 → 0`` when the wall is closed and the interval reaches the
-    last vertex.
-    """
-    n = len(pl.vertices)
-    if n < 2:
-        return []
-    idxs: list[int] = []
-    for i in range(iv.from_vertex, iv.to_vertex):
-        if 0 <= i < n - 1:
-            idxs.append(i)
-    if pl.closed and iv.to_vertex == n - 1:
-        closing = n - 1
-        if closing not in idxs:
-            idxs.append(closing)
-    return idxs
+__all__ = [
+    "Anchor",
+    "AnyPolyline",
+    "Arch",
+    "EyePath",
+    "GridConfig",
+    "Level",
+    "LevelMeta",
+    "Polyline",
+    "PolylineType",
+    "TextureInterval",
+    "Wall",
+    "convert_polyline_type",
+    "interval_edge_indices",
+    "wall_edge_index_pairs",
+]
 
 
 @dataclass
@@ -181,231 +142,6 @@ class GridConfig:
     cell_size: float = 1.0
 
 
-# ── Polyline ──────────────────────────────────────────────────────────────────
-
-@dataclass
-class Polyline:
-    """
-    Universal polyline container for all three types.
-
-    Field usage by type
-    ───────────────────
-    WALL:     vertices, closed, texture_intervals
-    ARCH:     vertices[0] = position (x,z); orientation, width, height_override,
-              texture, transparency, z_offset, v_at_floor,
-              is_light_source, light_color, light_intensity
-    EYEPATH:  vertices, edges
-    ANCHOR:   vertices[0] = position (x,z); radius, height, z_offset,
-              max_distance, fov_limit, sprite_count, tags
-    """
-    id:   str
-    type: PolylineType = PolylineType.WALL
-
-    # ── WALL / EYEPATH ──────────────────────────────────────────────────────
-    vertices: list[tuple[float, float]] = field(default_factory=list)
-    closed:   bool = False
-
-    # WALL — texture intervals (replaces single texture in v1)
-    texture_intervals: list[TextureInterval] = field(default_factory=list)
-
-    # EYEPATH — connectivity graph
-    edges: list[tuple[int, int]] = field(default_factory=list)
-
-    # ── ARCH ─────────────────────────────────────────────────────────────────
-    # Position is stored as vertices[0]; use the .position property.
-    orientation:    Union[str, float] = "billboard"  # "billboard" or degrees
-    width:          float = 4.0
-    height_override: Optional[float] = None          # None → use level wall_height
-    texture:        Optional[str] = None             # Arch texture (also v1 compat)
-    transparency:   str = "alpha_test"               # "none"|"alpha_test"|"alpha_blend"
-    z_offset:       float = 0.0
-    v_at_floor:     bool = True     # V=0 of texture always at world Z=0
-    is_light_source: bool = False
-    light_color:    tuple[float, float, float] = (1.0, 0.75, 0.4)
-    light_intensity: float = 1.0
-    warning:        bool = False
-
-    # ── ADAPTIVE ARCH (v3) ───────────────────────────────────────────────────
-    auto_snap:      bool = False
-    target_walls:   list[str] = field(default_factory=list)
-
-    # ── ANCHOR ───────────────────────────────────────────────────────────────
-    radius:         float = 0.5     # nominal footprint half-width (m)
-    height:         float = 2.0     # nominal extent height (m); vertical size of
-                                    #   the visibility sample grid (artist-estimated)
-    max_distance:   float = 10.0
-    fov_limit:      Optional[float] = None
-    sprite_count:   int = 1
-    tags:           list[str] = field(default_factory=list)
-
-    # ── Convenience properties ────────────────────────────────────────────────
-
-    @property
-    def position(self) -> tuple[float, float]:
-        """ARCH only: placement point in XZ. Stored as vertices[0]."""
-        return self.vertices[0] if self.vertices else (0.0, 0.0)
-
-    @position.setter
-    def position(self, value: tuple[float, float]) -> None:
-        if self.vertices:
-            self.vertices[0] = tuple(value)
-        else:
-            self.vertices.append(tuple(value))
-
-    # ── Factory methods ───────────────────────────────────────────────────────
-
-    @staticmethod
-    def make_new() -> "Polyline":
-        """Create a new empty WALL polyline (backward-compatible default)."""
-        return Polyline(id=str(uuid.uuid4()), type=PolylineType.WALL)
-
-    @staticmethod
-    def make_wall() -> "Polyline":
-        return Polyline(id=str(uuid.uuid4()), type=PolylineType.WALL)
-
-    @staticmethod
-    def make_arch(position: tuple[float, float] = (0.0, 0.0)) -> "Polyline":
-        pl = Polyline(id=str(uuid.uuid4()), type=PolylineType.ARCH)
-        pl.vertices = [tuple(position)]
-        return pl
-
-    @staticmethod
-    def make_eyepath() -> "Polyline":
-        return Polyline(id=str(uuid.uuid4()), type=PolylineType.EYEPATH)
-
-    @staticmethod
-    def make_anchor(position: tuple[float, float] = (0.0, 0.0)) -> "Polyline":
-        pl = Polyline(id=str(uuid.uuid4()), type=PolylineType.ANCHOR)
-        pl.vertices = [tuple(position)]
-        return pl
-
-    # ── Serialisation helpers ─────────────────────────────────────────────────
-
-    def to_dict(self) -> dict:
-        d: dict = {"id": self.id, "type": self.type.value}
-        if self.type == PolylineType.WALL:
-            d["vertices"] = [list(v) for v in self.vertices]
-            d["closed"]   = self.closed
-            d["texture_intervals"] = [
-                {
-                    "from_vertex": iv.from_vertex,
-                    "to_vertex":   iv.to_vertex,
-                    "texture":     iv.texture,
-                    "x_offset":    iv.x_offset,
-                }
-                for iv in self.texture_intervals
-            ]
-        elif self.type == PolylineType.ARCH:
-            pos = self.vertices[0] if self.vertices else (0.0, 0.0)
-            d["position"]       = list(pos)
-            d["orientation"]    = self.orientation
-            d["width"]          = self.width
-            d["height_override"]= self.height_override
-            d["texture"]        = self.texture
-            d["transparency"]   = self.transparency
-            d["z_offset"]       = self.z_offset
-            d["v_at_floor"]     = self.v_at_floor
-            d["is_light_source"]= self.is_light_source
-            d["light_color"]    = list(self.light_color)
-            d["light_intensity"]= self.light_intensity
-            d["warning"]        = self.warning
-            d["auto_snap"]      = self.auto_snap
-            d["target_walls"]   = list(self.target_walls)
-        elif self.type == PolylineType.EYEPATH:
-            d["vertices"] = [list(v) for v in self.vertices]
-            d["edges"]    = [list(e) for e in self.edges]
-        elif self.type == PolylineType.ANCHOR:
-            pos = self.vertices[0] if self.vertices else (0.0, 0.0)
-            d["position"]       = list(pos)
-            d["z_offset"]       = self.z_offset
-            d["radius"]         = self.radius
-            d["height"]         = self.height
-            d["max_distance"]   = self.max_distance
-            d["fov_limit"]      = self.fov_limit
-            d["sprite_count"]   = self.sprite_count
-            d["tags"]           = list(self.tags)
-        return d
-
-    @staticmethod
-    def from_dict(pd: dict) -> "Polyline":
-        pl_type = PolylineType(pd.get("type", "wall"))
-
-        if pl_type == PolylineType.WALL:
-            pl = Polyline(
-                id       = pd["id"],
-                type     = pl_type,
-                vertices = [tuple(v) for v in pd.get("vertices", [])],
-                closed   = pd.get("closed", False),
-            )
-            kept: list[TextureInterval] = []
-            for ivd in pd.get("texture_intervals", []):
-                iv = TextureInterval(
-                    from_vertex = int(ivd["from_vertex"]),
-                    to_vertex   = int(ivd["to_vertex"]),
-                    texture     = ivd.get("texture"),
-                    x_offset    = float(ivd.get("x_offset", 0.0)),
-                )
-                if iv.from_vertex >= iv.to_vertex:
-                    continue
-                if any(_texture_intervals_overlap(iv, other) for other in kept):
-                    continue  # later overlaps dropped; do not refuse the file
-                kept.append(iv)
-            kept.sort(key=lambda x: x.from_vertex)
-            pl.texture_intervals = kept
-
-        elif pl_type == PolylineType.ARCH:
-            pos = tuple(pd.get("position", [0.0, 0.0]))
-            lc  = pd.get("light_color", [1.0, 0.75, 0.4])
-            pl  = Polyline(
-                id             = pd["id"],
-                type           = pl_type,
-                vertices       = [pos],
-                orientation    = pd.get("orientation", "billboard"),
-                width          = float(pd.get("width", 4.0)),
-                height_override= pd.get("height_override"),
-                texture        = pd.get("texture"),
-                transparency   = pd.get("transparency", "alpha_test"),
-                z_offset       = float(pd.get("z_offset", 0.0)),
-                v_at_floor     = bool(pd.get("v_at_floor", True)),
-                is_light_source= bool(pd.get("is_light_source", False)),
-                light_color    = (float(lc[0]), float(lc[1]), float(lc[2])),
-                light_intensity= float(pd.get("light_intensity", 1.0)),
-                warning        = bool(pd.get("warning", False)),
-                auto_snap      = bool(pd.get("auto_snap", False)),
-                target_walls   = list(pd.get("target_walls", [])),
-            )
-
-        elif pl_type == PolylineType.EYEPATH:
-            pl = Polyline(
-                id       = pd["id"],
-                type     = pl_type,
-                vertices = [tuple(v) for v in pd.get("vertices", [])],
-                edges    = [tuple(e) for e in pd.get("edges", [])],
-            )
-
-        elif pl_type == PolylineType.ANCHOR:
-            pos = tuple(pd.get("position", [0.0, 0.0]))
-            pl  = Polyline(
-                id             = pd["id"],
-                type           = pl_type,
-                vertices       = [pos],
-                z_offset       = float(pd.get("z_offset", 0.0)),
-                radius         = float(pd.get("radius", 0.5)),
-                height         = float(pd.get("height", 2.0)),
-                max_distance   = float(pd.get("max_distance", 10.0)),
-                fov_limit      = pd.get("fov_limit"),
-                sprite_count   = int(pd.get("sprite_count", 1)),
-                tags           = list(pd.get("tags", [])),
-            )
-            if pl.fov_limit is not None:
-                pl.fov_limit = float(pl.fov_limit)
-
-        else:
-            raise ValueError(f"Unknown polyline type: {pl_type!r}")
-
-        return pl
-
-
 # ── Level ─────────────────────────────────────────────────────────────────────
 
 class Level:
@@ -419,12 +155,12 @@ class Level:
     def __init__(self) -> None:
         self.meta:      LevelMeta  = LevelMeta()
         self.grid:      GridConfig = GridConfig()
-        self.polylines: dict[str, Polyline]          = {}
+        self.polylines: dict[str, AnyPolyline] = {}
         self.dirty:     bool = False
 
     # ── Polylines (shared) ────────────────────────────────────────────────────
 
-    def add_polyline(self, polyline: Polyline) -> None:
+    def add_polyline(self, polyline: AnyPolyline) -> None:
         self.polylines[polyline.id] = polyline
         self.dirty = True
 
@@ -432,17 +168,61 @@ class Level:
         self.polylines.pop(polyline_id, None)
         self.dirty = True
 
-    def get_polyline(self, polyline_id: str) -> Optional[Polyline]:
+    def replace_polyline(self, polyline: AnyPolyline) -> None:
+        """Swap the record at `polyline.id` (used when converting type)."""
+        self.polylines[polyline.id] = polyline
+        self.dirty = True
+
+    def get_polyline(self, polyline_id: str) -> Optional[AnyPolyline]:
         return self.polylines.get(polyline_id)
 
-    def eyepaths(self) -> list[Polyline]:
-        return [pl for pl in self.polylines.values() if pl.type == PolylineType.EYEPATH]
+    def eyepaths(self) -> list[EyePath]:
+        return [pl for pl in self.polylines.values() if isinstance(pl, EyePath)]
 
-    def walls(self) -> list[Polyline]:
-        return [pl for pl in self.polylines.values() if pl.type == PolylineType.WALL]
+    def walls(self) -> list[Wall]:
+        return [pl for pl in self.polylines.values() if isinstance(pl, Wall)]
 
-    def anchors(self) -> list[Polyline]:
-        return [pl for pl in self.polylines.values() if pl.type == PolylineType.ANCHOR]
+    def anchors(self) -> list[Anchor]:
+        return [pl for pl in self.polylines.values() if isinstance(pl, Anchor)]
+
+    def arches(self) -> list[Arch]:
+        return [pl for pl in self.polylines.values() if isinstance(pl, Arch)]
+
+    def eyepath_offset(self, path_id: str) -> int:
+        """Global vertex index of local 0 on this EyePath (sum of earlier paths)."""
+        offset = 0
+        for pl in self.eyepaths():
+            if pl.id == path_id:
+                return offset
+            offset += len(pl.vertices)
+        return 0
+
+    def eyepath_vertex(self, global_index: int) -> Optional[tuple[float, float]]:
+        """Look up a vertex across every EyePath using the bake/client global index."""
+        n = 0
+        for pl in self.eyepaths():
+            if global_index < n + len(pl.vertices):
+                return pl.vertices[global_index - n]
+            n += len(pl.vertices)
+        return None
+
+    def iter_eyepath_directed_edges(
+        self,
+    ) -> Iterator[tuple[int, int, tuple[float, float], tuple[float, float]]]:
+        """Yield (g_from, g_to, p_from, p_to) for both directions of every EyePath edge."""
+        offset = 0
+        seen: set[tuple[int, int]] = set()
+        for pl in self.eyepaths():
+            for a, b in pl.edges:
+                for e in ((a, b), (b, a)):
+                    g = (e[0] + offset, e[1] + offset)
+                    if g in seen:
+                        continue
+                    if e[0] >= len(pl.vertices) or e[1] >= len(pl.vertices):
+                        continue
+                    seen.add(g)
+                    yield g[0], g[1], pl.vertices[e[0]], pl.vertices[e[1]]
+            offset += len(pl.vertices)
 
     def add_vertex(self, polyline_id: str, x: float, z: float) -> None:
         pl = self.polylines.get(polyline_id)
@@ -461,31 +241,31 @@ class Level:
         pl = self.polylines.get(polyline_id)
         if pl is not None and 0 <= idx < len(pl.vertices):
             pl.vertices.pop(idx)
-            
-            # Adjust texture intervals
-            new_intervals = []
-            for iv in pl.texture_intervals:
-                fv = iv.from_vertex
-                tv = iv.to_vertex
-                if fv > idx:
-                    fv -= 1
-                if tv > idx:
-                    tv -= 1
-                if fv < tv:
-                    iv.from_vertex = fv
-                    iv.to_vertex = tv
-                    new_intervals.append(iv)
-            pl.texture_intervals = new_intervals
 
-            # Adjust edges
-            new_edges = []
-            for vi, vj in pl.edges:
-                if vi == idx or vj == idx:
-                    continue  # remove the edge
-                new_vi = vi - 1 if vi > idx else vi
-                new_vj = vj - 1 if vj > idx else vj
-                new_edges.append((new_vi, new_vj))
-            pl.edges = new_edges
+            if isinstance(pl, Wall):
+                new_intervals = []
+                for iv in pl.texture_intervals:
+                    fv = iv.from_vertex
+                    tv = iv.to_vertex
+                    if fv > idx:
+                        fv -= 1
+                    if tv > idx:
+                        tv -= 1
+                    if fv < tv:
+                        iv.from_vertex = fv
+                        iv.to_vertex = tv
+                        new_intervals.append(iv)
+                pl.texture_intervals = new_intervals
+
+            if isinstance(pl, EyePath):
+                new_edges = []
+                for vi, vj in pl.edges:
+                    if vi == idx or vj == idx:
+                        continue
+                    new_vi = vi - 1 if vi > idx else vi
+                    new_vj = vj - 1 if vj > idx else vj
+                    new_edges.append((new_vi, new_vj))
+                pl.edges = new_edges
 
             self.dirty = True
 
@@ -505,39 +285,37 @@ class Level:
 
         pl.vertices.insert(after_idx + 1, (x, z))
 
-        # Shift texture-interval endpoints past the split point.
-        for iv in pl.texture_intervals:
-            if iv.from_vertex > after_idx:
-                iv.from_vertex += 1
-            if iv.to_vertex > after_idx:
-                iv.to_vertex += 1
+        if isinstance(pl, Wall):
+            for iv in pl.texture_intervals:
+                if iv.from_vertex > after_idx:
+                    iv.from_vertex += 1
+                if iv.to_vertex > after_idx:
+                    iv.to_vertex += 1
 
-        # Shift eyepath edge endpoints past the split point, then split any
-        # edge that spanned the insertion (after_idx → after_idx+1 becomes
-        # after_idx → new and new → after_idx+2, plus the reverse if present).
-        new_idx = after_idx + 1
-        shifted: list[tuple[int, int]] = [
-            (vi + 1 if vi > after_idx else vi,
-             vj + 1 if vj > after_idx else vj)
-            for (vi, vj) in pl.edges
-        ]
-        split: list[tuple[int, int]] = []
-        for vi, vj in shifted:
-            if vi == after_idx and vj == new_idx + 1:
-                split.append((after_idx, new_idx))
-                split.append((new_idx, new_idx + 1))
-            elif vj == after_idx and vi == new_idx + 1:
-                split.append((new_idx + 1, new_idx))
-                split.append((new_idx, after_idx))
-            else:
-                split.append((vi, vj))
-        pl.edges = split
+        if isinstance(pl, EyePath):
+            new_idx = after_idx + 1
+            shifted: list[tuple[int, int]] = [
+                (vi + 1 if vi > after_idx else vi,
+                 vj + 1 if vj > after_idx else vj)
+                for (vi, vj) in pl.edges
+            ]
+            split: list[tuple[int, int]] = []
+            for vi, vj in shifted:
+                if vi == after_idx and vj == new_idx + 1:
+                    split.append((after_idx, new_idx))
+                    split.append((new_idx, new_idx + 1))
+                elif vj == after_idx and vi == new_idx + 1:
+                    split.append((new_idx + 1, new_idx))
+                    split.append((new_idx, after_idx))
+                else:
+                    split.append((vi, vj))
+            pl.edges = split
 
         self.dirty = True
 
     def set_polyline_closed(self, polyline_id: str, closed: bool) -> None:
         pl = self.polylines.get(polyline_id)
-        if pl is not None:
+        if isinstance(pl, Wall):
             pl.closed = closed
             self.dirty = True
 
@@ -549,15 +327,16 @@ class Level:
         pl = self.polylines.get(polyline_id)
         if pl is None:
             return
-        if pl.type == PolylineType.ARCH:
+        if isinstance(pl, Arch):
             pl.texture = texture
-        else:
-            # WALL fallback: replace all intervals with one spanning the whole line
+        elif isinstance(pl, Wall):
             n = max(0, len(pl.vertices) - 1)
             pl.texture_intervals = (
                 [TextureInterval(from_vertex=0, to_vertex=n, texture=texture)]
                 if texture is not None else []
             )
+        else:
+            return
         self.dirty = True
 
     # ── Wall: texture intervals ───────────────────────────────────────────────
@@ -565,7 +344,7 @@ class Level:
     def add_texture_interval(self, polyline_id: str,
                              interval: TextureInterval) -> None:
         pl = self.polylines.get(polyline_id)
-        if pl is not None and pl.type == PolylineType.WALL:
+        if isinstance(pl, Wall):
             if interval.from_vertex >= interval.to_vertex:
                 return          # zero- or negative-length interval is a no-op
             for other in pl.texture_intervals:
@@ -577,7 +356,7 @@ class Level:
 
     def remove_texture_interval(self, polyline_id: str, index: int) -> None:
         pl = self.polylines.get(polyline_id)
-        if pl is not None and 0 <= index < len(pl.texture_intervals):
+        if isinstance(pl, Wall) and 0 <= index < len(pl.texture_intervals):
             pl.texture_intervals.pop(index)
             self.dirty = True
 
@@ -589,7 +368,7 @@ class Level:
         No-op if at_vertex is not inside any interval or is at a boundary.
         """
         pl = self.polylines.get(polyline_id)
-        if pl is None:
+        if not isinstance(pl, Wall):
             return
         for i, iv in enumerate(pl.texture_intervals):
             if iv.from_vertex < at_vertex < iv.to_vertex:
@@ -608,7 +387,7 @@ class Level:
                             index: int, texture: Optional[str]) -> None:
         """Replace the texture on an existing interval (by index)."""
         pl = self.polylines.get(polyline_id)
-        if pl is not None and 0 <= index < len(pl.texture_intervals):
+        if isinstance(pl, Wall) and 0 <= index < len(pl.texture_intervals):
             pl.texture_intervals[index].texture = texture
             self.dirty = True
 
@@ -616,7 +395,7 @@ class Level:
                               index: int, x_offset: float) -> None:
         """Update the x_offset on an existing interval (by index)."""
         pl = self.polylines.get(polyline_id)
-        if pl is not None and 0 <= index < len(pl.texture_intervals):
+        if isinstance(pl, Wall) and 0 <= index < len(pl.texture_intervals):
             pl.texture_intervals[index].x_offset = x_offset
             self.dirty = True
 
@@ -625,7 +404,7 @@ class Level:
     def add_eyepath_edge(self, polyline_id: str,
                          v_from: int, v_to: int) -> None:
         pl = self.polylines.get(polyline_id)
-        if pl is not None and pl.type == PolylineType.EYEPATH:
+        if isinstance(pl, EyePath):
             n_verts = len(pl.vertices)
             if 0 <= v_from < n_verts and 0 <= v_to < n_verts:
                 edge = (v_from, v_to)
@@ -636,7 +415,7 @@ class Level:
     def remove_eyepath_edge(self, polyline_id: str,
                             v_from: int, v_to: int) -> None:
         pl = self.polylines.get(polyline_id)
-        if pl is not None and pl.type == PolylineType.EYEPATH:
+        if isinstance(pl, EyePath):
             try:
                 pl.edges.remove((v_from, v_to))
                 self.dirty = True

@@ -169,7 +169,7 @@ class TestIntervalWorkflow:
         level.add_polyline(arch)
         level.add_texture_interval(arch.id, TextureInterval(0, 1))
         # Arch type → interval should NOT be added
-        assert len(arch.texture_intervals) == 0
+        assert not hasattr(arch, "texture_intervals")
 
     def test_round_trip_preserves_intervals(self):
         level, pl = _wall_with_verts(6)
@@ -227,7 +227,7 @@ class TestEyePathEdgeWorkflow:
         level.add_polyline(wall)
         level.add_eyepath_edge(wall.id, 0, 1)
         # Wall type → edge should NOT be added
-        assert len(wall.edges) == 0
+        assert not hasattr(wall, "edges")
 
     def test_add_edge_out_of_bounds_is_noop(self):
         level, pl = _eyepath_with_verts(4)

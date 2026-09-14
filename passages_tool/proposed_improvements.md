@@ -20,13 +20,13 @@ Status: **done** · **partial** · **open**
 |---|---|---|
 | §2 P0 correctness / data-loss | **done** | Nested `b9011b6`; GitHub `6ed69e8` |
 | §3 P1 editor interaction | **done** | Nested `f07a0e3`; GitHub `b9f5b0a`; 3.13 typed warnings |
-| §4 P1 bake / converter | **partial** | Per-room floors; geometric midpoints kept; `bake.bat` ships; 4.2 combined `scene.egg` still a second CLI pass |
-| §5 P2 architecture | **partial** | 5.1/5.4/5.6/5.7/5.8 done; 5.2 union type and 5.5 EggContext still open |
+| §4 P1 bake / converter | **partial** | Per-room floors; geometric midpoints kept; all EyePaths bake; 4.2 combined `scene.egg` still a second CLI pass |
+| §5 P2 architecture | **partial** | 5.1–5.4, 5.6–5.8 done; 5.5 EggContext still open |
 | §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat`/`bake.bat` share `_ensure_venv.bat` (repairs leftover Miniconda venvs); rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | After remaining P1 forks |
 
-Tests at last P2-split commit: **175 passed**.
+Tests at last union/multi-EyePath commit: **176 passed**.
 
 ---
 
@@ -41,7 +41,7 @@ Do not re-derive these; extend them.
 | `wall_edge_index_pairs(pl)` | `editor/level.py` | Wall segments including the closing edge (`n ≥ 3`). Used by validator, occluder, and viewport edge-pick. |
 | `interval_edge_indices(pl, iv)` | `editor/level.py` | Edges covered by one texture interval, including closing edge when `to_vertex == n-1`. Wall builder and `validate_textures` share this. |
 | `_texture_intervals_overlap(a, b)` | `editor/level.py` | Half-open `[from, to)` overlap. `add_texture_interval` no-ops on overlap; `validate_textures` still warns for intervals already on disk. |
-| `Level.eyepaths()` / `walls()` / `anchors()` | `editor/level.py` | Typed polyline lists. Bake/preview still use the **first** EyePath. |
+| `Level.eyepaths()` / `walls()` / `anchors()` / `arches()` | `editor/level.py` | Typed polyline lists. Bake/preview/client merge every EyePath with `eyepath_offset`. |
 | `arch_view_angle(orientation, view)` | `editor/arch_utils.py` | Shared face-on/edge-on math → `ArchViewAngle` or `None`. Validator: `to_plane_deg`; `edge_on_check`: `from_normal_deg`. |
 | `Level.sync_derived_fov_h()` | `editor/level.py` | Updates `meta.fov_h` without touching `dirty`. |
 | `History.redo(current_snapshot)` | `editor/history.py` | Pushes current onto `_undos` before popping redo (undo→redo→undo no longer skips). |
@@ -168,15 +168,15 @@ Recursive scan; `editor_state.json`; default `assets/sample_textures`.
 
 ### 3.13 Validate is a modal dump — **done** (typed; floor/ceiling still no jump)
 
-`ValidationWarning` has `kind` + `target_id` (`untextured_wall`, `interval_overlap`, `missing_floor`, `missing_ceiling`, `extra_eyepath`, `arch_edge_on`). `arch_id` is an alias of `target_id`. Select still frames a polyline when `target_id` is set; floor/ceiling remain level-meta (nothing to frame).
+`ValidationWarning` has `kind` + `target_id` (`untextured_wall`, `interval_overlap`, `missing_floor`, `missing_ceiling`, `arch_edge_on`). `arch_id` is an alias of `target_id`. Select still frames a polyline when `target_id` is set; floor/ceiling remain level-meta (nothing to frame).
 
 ---
 
 ## 4. P1 — bake and converter pipeline
 
-### 4.1 Only the first EyePath exists — **partial**
+### 4.1 Only the first EyePath exists — **done**
 
-`validate_structure` warns. Bake, preview, and `validate_arch_visibility` still use `eyepaths()[0]`. Namespaced multi-path keys (`pathId/v0000_to_v0001`) are remaining scope if more than one path is a real authoring need.
+Every EyePath bakes. Vertex indices are **global** (sum of earlier paths' vertex counts) so a single path is unchanged (`v0000_to_v0001`) and a second path continues (`v0002_…` if the first had two vertices). `validate_structure` no longer warns. The minigame `mergeEyepaths()` uses the same offset.
 
 ### 4.2 `build_scene` builds every mesh twice — **partial**
 
@@ -226,13 +226,13 @@ Config, baker `--height` help, README sample, user guide, and rendering-design t
 
 Helpers `_point_seg_dist2` and `convert_polyline_type` live next to those mixins. Tests: `tests/test_app_helpers.py`.
 
-### 5.2 One `Polyline` dataclass for four types — **open**
+### 5.2 One `Polyline` dataclass for four types — **done**
 
-`convert_polyline_type` papers over illegal in-memory states. A union type is still the long-term fix.
+Runtime records are `Wall | Arch | EyePath | Anchor` (`editor/polyline_data.py`). `Polyline` is a factory namespace (`make_wall`, `from_dict`). `convert_polyline_type` returns a **new** object; `Level.replace_polyline` swaps it in. Type-specific fields (`edges`, `texture_intervals`, `closed`, …) exist only on the matching class.
 
 ### 5.3 Repeated “find the EyePath” loops — **done** (first-path policy remains)
 
-`Level.eyepaths()`, `walls()`, `anchors()` exist. Manifest, baker, occluder, and viewpoint renderer use them (still first EyePath only).
+`Level.eyepaths()`, `walls()`, `anchors()` exist. Manifest, baker, occluder, and viewpoint renderer walk every EyePath.
 
 ### 5.4 `render_edge` / `render_midpoint` copies — **done**
 
@@ -321,7 +321,7 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 
 P0, core P1, docs pass, per-room floors, and small leftovers are done. Geometric midpoints kept.
 
-P2 splits (5.1, 5.4, 5.6, 5.7, 5.8) are done. Remaining P2: **5.2** union polyline type, **5.5** EggContext texture parenting.
+P2 union types and multi-EyePath bake are done. Remaining P2: **5.5** EggContext texture parenting.
 
 Next: Feature 11 (yaw-strip slew) is a minigame+baker project. Feature 12 (HiDPI / adjustable editor text) is editor-only and not implemented.
 
@@ -332,7 +332,7 @@ Next: Feature 11 (yaw-strip slew) is a minigame+baker project. Feature 12 (HiDPI
 | Area | Paths |
 |---|---|
 | App shell | `src/passages_tool/main.py`, `app/input.py`, `app/commands.py`, `app/preview.py`, `log.py` |
-| Document | `src/passages_tool/editor/level.py`, `history.py`, `validator.py`, `arch_utils.py` |
+| Document | `src/passages_tool/editor/level.py`, `polyline_data.py`, `history.py`, `validator.py`, `arch_utils.py` |
 | Viewport gfx | `src/passages_tool/editor/polyline.py`, `viewport/camera.py`, `viewport/grid.py` |
 | UI | `src/passages_tool/ui/toolbar.py`, `properties.py`, `palette.py` |
 | I/O | `src/passages_tool/io/level_format.py` |
