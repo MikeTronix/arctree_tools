@@ -6,7 +6,7 @@ Panda3D offscreen renderer to bake viewpoint screenshots for level transitions.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Filename, PNMImage, PerspectiveLens, PointLight, LColor
@@ -44,6 +44,68 @@ class ViewpointRenderer:
         # offscreen camera is reparented onto scene_root, so it still sees it.
         self.scene_root = load_scene(self.level, self.scene_dir, self.base.loader)
 
+    def _eyepath_endpoints(
+        self, v_from: int, v_to: int
+    ) -> Optional[tuple[tuple[float, float], tuple[float, float]]]:
+        paths = self.level.eyepaths()
+        eyepath_pl = paths[0] if paths else None
+        if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
+            return None
+        return eyepath_pl.vertices[v_from], eyepath_pl.vertices[v_to]
+
+    def _render_camera(
+        self,
+        pos: tuple[float, float],
+        look_at: tuple[float, float],
+        output_path: Path,
+        width: Optional[int],
+        height: Optional[int],
+        buffer_name: str,
+    ) -> bool:
+        """Place an offscreen camera at `pos`, look at `look_at`, write a PNG."""
+        eye_height = self.level.meta.eye_height
+        fov_v = self.level.meta.fov_v
+        render_w = width if width is not None else self.level.meta.render_width
+        render_h = height if height is not None else self.level.meta.render_height
+
+        buffer = self.base.win.make_texture_buffer(buffer_name, render_w, render_h)
+        if not buffer:
+            return False
+
+        cam = self.base.make_camera(buffer)
+        cam.reparent_to(self.scene_root)
+        cam.set_pos(pos[0], pos[1], eye_height)
+        cam.look_at(look_at[0], look_at[1], eye_height)
+
+        lens = PerspectiveLens()
+        aspect_ratio = render_w / max(1, render_h)
+        fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
+        lens.set_aspect_ratio(aspect_ratio)
+        lens.set_fov(fov_h_calc, fov_v)
+        lens.set_near_far(CAMERA_NEAR, CAMERA_FAR)
+        cam.node().set_lens(lens)
+
+        plight = PointLight("camera_headlight")
+        plight.set_color(LColor(1.0, 1.0, 1.0, 1.0))
+        plight.set_attenuation(HEADLIGHT_ATTENUATION)
+        pl_path = cam.attach_new_node(plight)
+        pl_path.set_pos(0, 0, 0)
+        self.scene_root.set_light(pl_path)
+
+        self.base.graphicsEngine.render_frame()
+        self.base.graphicsEngine.render_frame()
+
+        pnm = PNMImage()
+        ok = buffer.get_screenshot(pnm)
+        if ok:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            pnm.write(Filename.from_os_specific(str(output_path)))
+
+        self.scene_root.clear_light(pl_path)
+        self.base.graphicsEngine.remove_window(buffer)
+        cam.remove_node()
+        return ok
+
     def render_edge(
         self,
         v_from: int,
@@ -53,68 +115,13 @@ class ViewpointRenderer:
         height: Optional[int] = None,
     ) -> bool:
         """Render a single viewpoint edge to a PNG file."""
-        # Find EyePath vertices
-        paths = self.level.eyepaths()
-        eyepath_pl = paths[0] if paths else None
-
-        if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
+        ends = self._eyepath_endpoints(v_from, v_to)
+        if ends is None:
             return False
-
-        p_from = eyepath_pl.vertices[v_from]
-        p_to = eyepath_pl.vertices[v_to]
-        eye_height = self.level.meta.eye_height
-        fov_v = self.level.meta.fov_v
-
-        render_w = width if width is not None else self.level.meta.render_width
-        render_h = height if height is not None else self.level.meta.render_height
-
-        # 1. Create offscreen texture buffer
-        buffer = self.base.win.make_texture_buffer("viewpoint_buf", render_w, render_h)
-        if not buffer:
-            return False
-
-        # 2. Add camera to the buffer
-        cam = self.base.make_camera(buffer)
-        cam.reparent_to(self.scene_root)
-
-        # Set position and heading in Mapping A (Z-up, horizontal is X, Y)
-        cam.set_pos(p_from[0], p_from[1], eye_height)
-        cam.look_at(p_to[0], p_to[1], eye_height)
-
-        # Configure perspective lens (HFOV from VFOV × buffer aspect)
-        lens = PerspectiveLens()
-        aspect_ratio = render_w / max(1, render_h)
-        fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
-        lens.set_aspect_ratio(aspect_ratio)
-        lens.set_fov(fov_h_calc, fov_v)
-        lens.set_near_far(CAMERA_NEAR, CAMERA_FAR)
-        cam.node().set_lens(lens)
-
-        # Add camera headlight (PointLight) so the scene is illuminated from the viewer's viewpoint
-        plight = PointLight("camera_headlight")
-        plight.set_color(LColor(1.0, 1.0, 1.0, 1.0))
-        plight.set_attenuation(HEADLIGHT_ATTENUATION)
-        pl_path = cam.attach_new_node(plight)
-        pl_path.set_pos(0, 0, 0)
-        self.scene_root.set_light(pl_path)
-
-        # 3. Render frame (render twice to guarantee textures load on the GPU)
-        self.base.graphicsEngine.render_frame()
-        self.base.graphicsEngine.render_frame()
-
-        # 4. Save screenshot
-        pnm = PNMImage()
-        ok = buffer.get_screenshot(pnm)
-        if ok:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            pnm.write(Filename.from_os_specific(str(output_path)))
-
-        # 5. Clean up camera and buffer
-        self.scene_root.clear_light(pl_path)
-        self.base.graphicsEngine.remove_window(buffer)
-        cam.remove_node()
-
-        return ok
+        p_from, p_to = ends
+        return self._render_camera(
+            p_from, p_to, output_path, width, height, "viewpoint_buf"
+        )
 
     def render_midpoint(
         self,
@@ -130,72 +137,17 @@ class ViewpointRenderer:
         `compute_transition_path` helper). That helper remains for validation
         experiments; changing bake camera placement is a content-visible fork.
         """
-        # Find EyePath vertices
-        paths = self.level.eyepaths()
-        eyepath_pl = paths[0] if paths else None
-
-        if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
+        ends = self._eyepath_endpoints(v_from, v_to)
+        if ends is None:
             return False
-
-        p_from = eyepath_pl.vertices[v_from]
-        p_to = eyepath_pl.vertices[v_to]
-        eye_height = self.level.meta.eye_height
-        fov_v = self.level.meta.fov_v
-
-        render_w = width if width is not None else self.level.meta.render_width
-        render_h = height if height is not None else self.level.meta.render_height
-
-        # Calculate midpoint position
-        p_mid_x = p_from[0] + 0.5 * (p_to[0] - p_from[0])
-        p_mid_y = p_from[1] + 0.5 * (p_to[1] - p_from[1])
-
-        # 1. Create offscreen texture buffer
-        buffer = self.base.win.make_texture_buffer("midpoint_buf", render_w, render_h)
-        if not buffer:
-            return False
-
-        # 2. Add camera to the buffer
-        cam = self.base.make_camera(buffer)
-        cam.reparent_to(self.scene_root)
-
-        # Set camera position at midpoint, looking towards the destination
-        cam.set_pos(p_mid_x, p_mid_y, eye_height)
-        cam.look_at(p_to[0], p_to[1], eye_height)
-
-        # Configure perspective lens (HFOV from VFOV × buffer aspect)
-        lens = PerspectiveLens()
-        aspect_ratio = render_w / max(1, render_h)
-        fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
-        lens.set_aspect_ratio(aspect_ratio)
-        lens.set_fov(fov_h_calc, fov_v)
-        lens.set_near_far(CAMERA_NEAR, CAMERA_FAR)
-        cam.node().set_lens(lens)
-
-        # Add camera headlight (PointLight) so the scene is illuminated from the viewer's viewpoint
-        plight = PointLight("camera_headlight")
-        plight.set_color(LColor(1.0, 1.0, 1.0, 1.0))
-        plight.set_attenuation(HEADLIGHT_ATTENUATION)
-        pl_path = cam.attach_new_node(plight)
-        pl_path.set_pos(0, 0, 0)
-        self.scene_root.set_light(pl_path)
-
-        # 3. Render frame (render twice to guarantee textures load on the GPU)
-        self.base.graphicsEngine.render_frame()
-        self.base.graphicsEngine.render_frame()
-
-        # 4. Save screenshot
-        pnm = PNMImage()
-        ok = buffer.get_screenshot(pnm)
-        if ok:
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            pnm.write(Filename.from_os_specific(str(output_path)))
-
-        # 5. Clean up camera and buffer
-        self.scene_root.clear_light(pl_path)
-        self.base.graphicsEngine.remove_window(buffer)
-        cam.remove_node()
-
-        return ok
+        p_from, p_to = ends
+        p_mid = (
+            p_from[0] + 0.5 * (p_to[0] - p_from[0]),
+            p_from[1] + 0.5 * (p_to[1] - p_from[1]),
+        )
+        return self._render_camera(
+            p_mid, p_to, output_path, width, height, "midpoint_buf"
+        )
 
     def close(self) -> None:
         """Detaches and cleans up the loaded scene graph."""

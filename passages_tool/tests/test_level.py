@@ -13,24 +13,17 @@ def make_level() -> Level:
     return level, pl.id
 
 
-class TestTiles:
-    def test_set_and_get(self):
-        level = Level()
-        level.set_tile(3, 4, "stone.png")
-        t = level.get_tile(3, 4)
-        assert t is not None
-        assert t.texture == "stone.png"
-        assert level.dirty
+class TestLegacyTiles:
+    def test_to_dict_omits_tiles(self):
+        data = Level().to_dict()
+        assert "tiles" not in data
 
-    def test_clear_tile_with_none(self):
-        level = Level()
-        level.set_tile(1, 1, "floor.png")
-        level.set_tile(1, 1, None)
-        assert level.get_tile(1, 1) is None
-
-    def test_missing_tile_returns_none(self):
-        level = Level()
-        assert level.get_tile(99, 99) is None
+    def test_tiles_key_ignored_on_load(self):
+        data = Level().to_dict()
+        data["tiles"] = [{"x": 2, "y": 3, "texture": "brick.png"}]
+        restored = Level.from_dict(data)
+        assert "tiles" not in restored.to_dict()
+        assert not hasattr(restored, "set_tile")
 
 
 class TestPolylines:
@@ -91,15 +84,7 @@ class TestSerialization:
     def test_empty_level(self):
         level = Level()
         restored = self._round_trip(level)
-        assert restored.tiles == {}
         assert restored.polylines == {}
-
-    def test_tiles_survive_round_trip(self):
-        level = Level()
-        level.set_tile(2, 3, "brick.png")
-        restored = self._round_trip(level)
-        t = restored.get_tile(2, 3)
-        assert t is not None and t.texture == "brick.png"
 
     def test_polylines_survive_round_trip(self):
         level, pid = make_level()

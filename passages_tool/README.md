@@ -24,7 +24,9 @@ A standalone Python + Panda3D application for designing, compiling, and baking 2
 ```
 passages_tool/
 ├── src/passages_tool/
-│   ├── main.py            Editor entry point — ShowBase controller
+│   ├── main.py            Editor shell (ShowBase + ImGui)
+│   ├── app/               Input, file commands, 3D preview mixins
+│   ├── log.py             Shared logging for editor and CLI
 │   ├── config.py          App-wide parameters and default style configurations
 │   ├── converter/         3D Scene Compiler (JSON -> .egg)
 │   │   ├── arch_builder.py          Arch geometry quads and billboard setup
@@ -175,7 +177,6 @@ Levels are serialized to JSON in a version 2 format that stores scale details, t
   "grid": {
     "cell_size": 1.0
   },
-  "tiles": [],
   "polylines": [
     {
       "id": "wall_0",
@@ -217,4 +218,4 @@ Levels are serialized to JSON in a version 2 format that stores scale details, t
 }
 ```
 
-`fov_h` is **derived** from `fov_v` and `render_width`/`render_height` on load and save (here 60° V at 1024×576 ≈ 91.5° H). Do not author it independently. `grid.cell_size` and `tiles` are unused by the viewport and baker. EyePath `edges` are directed. Bake uses the first EyePath only.
+`fov_h` is **derived** from `fov_v` and `render_width`/`render_height` on load and save (here 60° V at 1024×576 ≈ 91.5° H). Do not author it independently. `grid.cell_size` is an unused on-disk alias of `snap_grid`. A legacy `tiles` array is ignored on load and not written. EyePath `edges` are directed. Bake uses the first EyePath only.

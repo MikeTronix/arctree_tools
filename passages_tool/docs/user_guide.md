@@ -304,7 +304,7 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `meta.pixels_per_meter` | Texture scale (legacy `texture_pixel_size` migrates) |
 | `meta.snap_grid` | Editor snap and visual grid |
 | `grid.cell_size` | Serialized leftover; the viewport does not use it |
-| `tiles` | Reserved; no editor or baker |
+| `tiles` | Legacy; ignored on load, not written |
 | `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
 | Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
 | EyePath `edges` | Directed `[from, to]` pairs |

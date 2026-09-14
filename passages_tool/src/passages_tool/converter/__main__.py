@@ -11,6 +11,9 @@ from pathlib import Path
 
 from passages_tool.converter.scene_builder import build_scene
 from passages_tool.io.level_format import LevelIOError, load
+from passages_tool.log import configure_cli, get_logger
+
+log = get_logger("converter")
 
 
 def main() -> None:
@@ -31,29 +34,30 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    configure_cli()
 
     level_path = Path(args.level_file)
     output_dir = Path(args.output_dir)
     tex_dir = Path(args.textures) if args.textures else None
 
     if not level_path.is_file():
-        print(f"Error: Level file not found: {level_path}", file=sys.stderr)
+        log.error("Error: Level file not found: %s", level_path)
         sys.exit(1)
 
     if tex_dir and not tex_dir.is_dir():
-        print(f"Error: Texture directory not found: {tex_dir}", file=sys.stderr)
+        log.error("Error: Texture directory not found: %s", tex_dir)
         sys.exit(1)
 
-    print(f"Loading level: {level_path}")
+    log.info("Loading level: %s", level_path)
     try:
         level = load(level_path)
     except LevelIOError as e:
-        print(f"Error loading level: {e}", file=sys.stderr)
+        log.error("Error loading level: %s", e)
         sys.exit(1)
 
-    print("Building 3D scene geometry...")
+    log.info("Building 3D scene geometry...")
     scene_path = build_scene(level, output_dir, tex_dir)
-    print(f"Success. Combined scene file exported to: {scene_path}")
+    log.info("Success. Combined scene file exported to: %s", scene_path)
 
 
 if __name__ == "__main__":

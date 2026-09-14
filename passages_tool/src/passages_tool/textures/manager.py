@@ -5,7 +5,7 @@ Texture loading and thumbnail cache.
 
 TextureManager handles:
   - Scanning a directory for PNG/JPG images.
-  - Loading them as Panda3D Texture objects (for rendering on tiles/polylines).
+  - Loading them as Panda3D Texture objects (for rendering on polylines).
   - Generating Pillow-based thumbnail images and converting them to
     Panda3D Textures for display in the ImGui palette panel.
 

@@ -4,6 +4,11 @@ config.py — App-wide constants and default values.
 from __future__ import annotations
 
 import math
+from pathlib import Path
+
+# Tool checkout root (passages_tool/), not src/passages_tool/.
+TOOL_ROOT = Path(__file__).resolve().parents[2]
+EDITOR_STATE_PATH = TOOL_ROOT / "editor_state.json"
 
 # ── Window ────────────────────────────────────────────────────────────────────
 

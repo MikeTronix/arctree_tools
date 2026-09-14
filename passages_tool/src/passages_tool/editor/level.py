@@ -37,7 +37,6 @@ File format v2 summary
     "snap_grid": float,
     "floor_texture": str | null, "ceiling_texture": str | null
   },
-  "tiles": [...],           # legacy; retained for future use
   "polylines": [
     { "id": str, "type": "wall",
       "vertices": [[x,z],...], "closed": bool,
@@ -144,13 +143,6 @@ def interval_edge_indices(pl: "Polyline", iv: TextureInterval) -> list[int]:
         if closing not in idxs:
             idxs.append(closing)
     return idxs
-
-
-@dataclass
-class Tile:
-    x:       int
-    y:       int
-    texture: Optional[str] = None
 
 
 @dataclass
@@ -427,26 +419,8 @@ class Level:
     def __init__(self) -> None:
         self.meta:      LevelMeta  = LevelMeta()
         self.grid:      GridConfig = GridConfig()
-        self.tiles:     dict[tuple[int, int], Tile]  = {}
         self.polylines: dict[str, Polyline]          = {}
         self.dirty:     bool = False
-
-    # ── Tiles ─────────────────────────────────────────────────────────────────
-
-    def set_tile(self, x: int, y: int, texture: Optional[str]) -> None:
-        key = (x, y)
-        if texture is None and key in self.tiles:
-            del self.tiles[key]
-        else:
-            self.tiles[key] = Tile(x=x, y=y, texture=texture)
-        self.dirty = True
-
-    def get_tile(self, x: int, y: int) -> Optional[Tile]:
-        return self.tiles.get((x, y))
-
-    def clear_tiles(self) -> None:
-        self.tiles.clear()
-        self.dirty = True
 
     # ── Polylines (shared) ────────────────────────────────────────────────────
 
@@ -699,10 +673,6 @@ class Level:
                 "ceiling_texture":    m.ceiling_texture,
             },
             "grid": {"cell_size": m.snap_grid},
-            "tiles": [
-                {"x": t.x, "y": t.y, "texture": t.texture}
-                for t in self.tiles.values()
-            ],
             "polylines": [pl.to_dict() for pl in self.polylines.values()],
         }
 
@@ -738,8 +708,7 @@ class Level:
         # grid.cell_size is an on-disk alias of snap_grid (viewport uses snap_grid).
         level.grid.cell_size = m.snap_grid
 
-        for td in data.get("tiles", []):
-            level.set_tile(td["x"], td["y"], td.get("texture"))
+        # Legacy `tiles` (floor-cell map) is ignored; the baker never used it.
 
         for pd in data.get("polylines", []):
             level.add_polyline(Polyline.from_dict(pd))
@@ -813,9 +782,6 @@ class Level:
             for x, z in pl.vertices:
                 xs.append(x)
                 zs.append(z)
-        for tile in self.tiles.values():
-            xs += [float(tile.x), float(tile.x + 1)]
-            zs += [float(tile.y), float(tile.y + 1)]
         if not xs:
             return (0.0, 10.0, 0.0, 10.0)
         return (min(xs), max(xs), min(zs), max(zs))

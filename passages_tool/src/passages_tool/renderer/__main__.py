@@ -9,16 +9,18 @@ import argparse
 import sys
 from pathlib import Path
 
+from passages_tool.converter.scene_builder import build_scene
 from passages_tool.io.level_format import LevelIOError, load
+from passages_tool.log import configure_cli, get_logger
 from passages_tool.renderer.manifest import (
     build_manifest,
     find_missing_images,
     find_stale_images,
     save_manifest,
 )
-from passages_tool.converter.scene_builder import build_scene
 from passages_tool.renderer.viewpoint_renderer import ViewpointRenderer
 
+log = get_logger("renderer")
 
 
 def main() -> None:
@@ -53,6 +55,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    configure_cli()
 
     level_path = Path(args.level_file)
     scene_dir = Path(args.scene_dir)
@@ -60,24 +63,24 @@ def main() -> None:
     tex_dir = Path(args.textures) if args.textures else None
 
     if not level_path.is_file():
-        print(f"Error: Level file not found: {level_path}", file=sys.stderr)
+        log.error("Error: Level file not found: %s", level_path)
         sys.exit(1)
 
     if not scene_dir.is_dir():
-        print(f"Error: Scene directory not found: {scene_dir}", file=sys.stderr)
+        log.error("Error: Scene directory not found: %s", scene_dir)
         sys.exit(1)
 
     if tex_dir and not tex_dir.is_dir():
-        print(f"Error: Texture directory not found: {tex_dir}", file=sys.stderr)
+        log.error("Error: Texture directory not found: %s", tex_dir)
         sys.exit(1)
 
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Loading level: {level_path}")
+    log.info("Loading level: %s", level_path)
     try:
         level = load(level_path)
     except LevelIOError as e:
-        print(f"Error loading level: {e}", file=sys.stderr)
+        log.error("Error loading level: %s", e)
         sys.exit(1)
 
     # 1. Build manifest
@@ -88,18 +91,20 @@ def main() -> None:
         has_vertices = bool(paths and paths[0].vertices)
         has_edges = bool(paths and paths[0].edges)
         if not has_eyepath:
-            print("Error: The level file has no EyePath polyline defined. Cannot render viewpoints.", file=sys.stderr)
+            log.error(
+                "Error: The level file has no EyePath polyline defined. Cannot render viewpoints."
+            )
         elif not has_vertices:
-            print("Error: The EyePath polyline in the level file has no vertices.", file=sys.stderr)
+            log.error("Error: The EyePath polyline in the level file has no vertices.")
         elif not has_edges:
-            print("Error: The EyePath polyline in the level file has no edges defined.", file=sys.stderr)
+            log.error("Error: The EyePath polyline in the level file has no edges defined.")
         else:
-            print("Error: No viewpoints could be generated for this level.", file=sys.stderr)
+            log.error("Error: No viewpoints could be generated for this level.")
         sys.exit(1)
 
     save_path = output_dir / "manifest.json"
     save_manifest(manifest, save_path)
-    print(f"Saved manifest skeleton to {save_path}")
+    log.info("Saved manifest skeleton to %s", save_path)
 
     # 2. Check for missing images
     if args.force:
@@ -108,22 +113,22 @@ def main() -> None:
         to_render = find_missing_images(manifest, output_dir)
 
     if not to_render:
-        print("All viewpoints already rendered. Use --force to re-render.")
+        log.info("All viewpoints already rendered. Use --force to re-render.")
         sys.exit(0)
 
     # 3. Build scene geometry
-    print("Building 3D scene geometry...")
+    log.info("Building 3D scene geometry...")
     try:
         build_scene(level, scene_dir, tex_dir, write_combined=False)
     except Exception as e:
-        print(f"Error compiling scene geometry: {e}", file=sys.stderr)
+        log.error("Error compiling scene geometry: %s", e)
         sys.exit(1)
 
     # 4. Instantiate ViewpointRenderer and render each frame
     try:
         renderer = ViewpointRenderer(level, scene_dir, tex_dir)
     except Exception as e:
-        print(f"Error initializing graphics renderer: {e}", file=sys.stderr)
+        log.error("Error initializing graphics renderer: %s", e)
         sys.exit(1)
 
     rendered_count = 0
@@ -131,7 +136,7 @@ def main() -> None:
 
     width = args.width if args.width is not None else level.meta.render_width
     height = args.height if args.height is not None else level.meta.render_height
-    print(f"Target rendering resolution: {width}x{height}")
+    log.info("Target rendering resolution: %sx%s", width, height)
 
     try:
         # Extract edge indices from key (e.g. v0000_to_v0001 -> 0, 1)
@@ -141,7 +146,7 @@ def main() -> None:
             v_to = int(parts[1][1:])
 
             dest_png = output_dir / f"render_{key}.png"
-            print(f"[{i+1}/{len(to_render)}] Rendering {dest_png.name}...")
+            log.info("[%s/%s] Rendering %s...", i + 1, len(to_render), dest_png.name)
 
             ok = renderer.render_edge(
                 v_from, v_to, dest_png, width, height
@@ -150,15 +155,15 @@ def main() -> None:
                 rendered_count += 1
                 manifest["edges"][key]["rendered"] = True
             else:
-                print(f"  Failed to render: {key}", file=sys.stderr)
+                log.error("  Failed to render: %s", key)
                 skipped_count += 1
 
         # Re-save manifest with updated viewpoint "rendered" statuses
         save_manifest(manifest, save_path)
-        print("Updated manifest with rendered statuses.")
+        log.info("Updated manifest with rendered statuses.")
 
         # 5. Bake midpoint traversal frames
-        print("\nBaking midpoint traversal frames...")
+        log.info("Baking midpoint traversal frames...")
         paths = level.eyepaths()
         eyepath_pl = paths[0] if paths else None
 
@@ -185,37 +190,48 @@ def main() -> None:
                     mid_skipped += 1
                     continue
 
-                print(f"[{idx+1}/{len(undirected)}] Rendering midpoint frame {dest_mid_png.name}...")
+                log.info(
+                    "[%s/%s] Rendering midpoint frame %s...",
+                    idx + 1,
+                    len(undirected),
+                    dest_mid_png.name,
+                )
                 ok = renderer.render_midpoint(
                     v_from, v_to, dest_mid_png, width, height
                 )
                 if ok:
                     mid_rendered += 1
                 else:
-                    print(f"  Failed to render midpoint: {key}", file=sys.stderr)
+                    log.error("  Failed to render midpoint: %s", key)
                     mid_failed += 1
-            print(f"Midpoint frame baking completed. Rendered {mid_rendered} images. Skipped: {mid_skipped}. Failed: {mid_failed}.")
+            log.info(
+                "Midpoint frame baking completed. Rendered %s images. Skipped: %s. Failed: %s.",
+                mid_rendered,
+                mid_skipped,
+                mid_failed,
+            )
         else:
-            print("No EyePath edges found. Skipping midpoint frame baking.")
+            log.info("No EyePath edges found. Skipping midpoint frame baking.")
 
         # 6. Final manifest rebuild to capture viewpoints and midpoints
         manifest = build_manifest(level, output_dir, tex_dir)
         save_manifest(manifest, save_path)
-        print("Final manifest saved with all rendered assets.")
+        log.info("Final manifest saved with all rendered assets.")
 
         stale = find_stale_images(manifest, output_dir)
         for stale_path in stale:
             try:
                 stale_path.unlink()
-                print(f"Removed stale render: {stale_path.name}")
+                log.info("Removed stale render: %s", stale_path.name)
             except OSError as e:
-                print(f"Could not remove stale {stale_path.name}: {e}", file=sys.stderr)
+                log.error("Could not remove stale %s: %s", stale_path.name, e)
     finally:
         renderer.close()
 
-    print(
-        f"Baking completed. Successfully rendered {rendered_count} static images. "
-        f"Failed/Skipped: {skipped_count}."
+    log.info(
+        "Baking completed. Successfully rendered %s static images. Failed/Skipped: %s.",
+        rendered_count,
+        skipped_count,
     )
 
 

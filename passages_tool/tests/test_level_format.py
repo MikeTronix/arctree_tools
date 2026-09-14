@@ -12,7 +12,6 @@ from passages_tool.io.level_format import LevelIOError, load, save
 def make_populated_level() -> Level:
     level = Level()
     level.meta.name = "Test Level"
-    level.set_tile(0, 0, "floor.png")
     pl = Polyline.make_new()
     level.add_polyline(pl)
     level.add_vertex(pl.id, 1.0, 2.0)
@@ -52,8 +51,6 @@ def test_round_trip(tmp_path):
     restored = load(out)
 
     assert restored.meta.name == "Test Level"
-    t = restored.get_tile(0, 0)
-    assert t is not None and t.texture == "floor.png"
     pls = list(restored.polylines.values())
     assert len(pls[0].texture_intervals) == 1
     assert pls[0].texture_intervals[0].texture == "wall.png"

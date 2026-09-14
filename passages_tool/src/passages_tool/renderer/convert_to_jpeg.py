@@ -15,6 +15,11 @@ from pathlib import Path
 
 from PIL import Image
 
+from passages_tool.config import TOOL_ROOT
+from passages_tool.log import configure_cli, get_logger
+
+log = get_logger("renderer.convert_to_jpeg")
+
 
 def _manifest_edge_entries(manifest_data: dict) -> list[dict]:
     """Return the per-edge dicts that hold image_path / midpoint_image_path.
@@ -34,8 +39,7 @@ def _manifest_edge_entries(manifest_data: dict) -> list[dict]:
 
 def local_basisu_binary() -> Path | None:
     """`passages_tool/bin/basisu[.exe]` next to the project (not src/bin)."""
-    tool_root = Path(__file__).resolve().parents[3]
-    binary = tool_root / "bin" / ("basisu.exe" if os.name == "nt" else "basisu")
+    binary = TOOL_ROOT / "bin" / ("basisu.exe" if os.name == "nt" else "basisu")
     return binary if binary.is_file() else None
 
 
@@ -78,10 +82,10 @@ def convert_renders(
     # Resolve basisu binary
     basisu_bin = find_basisu(basisu_path)
     if basisu_bin:
-        print(f"Found Basis Universal transcoder at: {basisu_bin}")
+        log.info("Found Basis Universal transcoder at: %s", basisu_bin)
     else:
-        print("Warning: basisu executable not found in PATH or local bin/ directory.", file=sys.stderr)
-        print("Skipping KTX2 supercompression, generating JPEG and PNG fallbacks only.", file=sys.stderr)
+        log.warning("basisu executable not found in PATH or local bin/ directory.")
+        log.warning("Skipping KTX2 supercompression, generating JPEG and PNG fallbacks only.")
 
     count = 0
     compiled_formats = {}  # Maps PNG name to compiled extension ('.ktx2', '.jpg', or '.png')
@@ -156,9 +160,7 @@ def convert_renders(
                         final_img.save(dest_jpg, "JPEG", quality=quality)
                         count += 1
             except Exception as e:
-                print(
-                    f"Error converting {file_path.name}: {e}", file=sys.stderr
-                )
+                log.error("Error converting %s: %s", file_path.name, e)
 
     # 3. Process and write manifest.json
     manifest_src = input_path / "manifest.json"
@@ -188,9 +190,9 @@ def convert_renders(
             dest_manifest = output_path / "manifest.json"
             with open(dest_manifest, "w", encoding="utf-8") as f:
                 json.dump(manifest_data, f, indent=2)
-            print("Successfully processed and wrote manifest.json to shipping folder.")
+            log.info("Successfully processed and wrote manifest.json to shipping folder.")
         except Exception as e:
-            print(f"Error processing manifest: {e}", file=sys.stderr)
+            log.error("Error processing manifest: %s", e)
 
     return count
 
@@ -219,6 +221,7 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+    configure_cli()
 
     try:
         count = convert_renders(
@@ -227,9 +230,9 @@ def main() -> None:
             args.quality,
             args.basisu_path,
         )
-        print(f"Successfully processed {count} images.")
+        log.info("Successfully processed %s images.", count)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        log.error("Error: %s", e)
         sys.exit(1)
 
 

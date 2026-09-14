@@ -21,12 +21,12 @@ Status: **done** · **partial** · **open**
 | §2 P0 correctness / data-loss | **done** | Nested `b9011b6`; GitHub `6ed69e8` |
 | §3 P1 editor interaction | **done** | Nested `f07a0e3`; GitHub `b9f5b0a`; 3.13 typed warnings |
 | §4 P1 bake / converter | **partial** | Per-room floors; geometric midpoints kept; `bake.bat` ships; 4.2 combined `scene.egg` still a second CLI pass |
-| §5 P2 architecture | **open** | `Level.eyepaths()` landed as a side effect of 4.1 |
+| §5 P2 architecture | **partial** | 5.1/5.4/5.6/5.7/5.8 done; 5.2 union type and 5.5 EggContext still open |
 | §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat`/`bake.bat` share `_ensure_venv.bat` (repairs leftover Miniconda venvs); rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | After remaining P1 forks |
 
-Tests at last P1 commit: **167 passed**.
+Tests at last P2-split commit: **175 passed**.
 
 ---
 
@@ -48,20 +48,23 @@ Do not re-derive these; extend them.
 | `validate_structure(level)` | `editor/validator.py` | Extra-EyePath warning. Called from editor Validate together with textures + arch visibility. |
 | `build_scene(..., write_combined=True)` | `converter/scene_builder.py` | Writes the four component eggs from one geometry pass. Combined `scene.egg` is a **second** pass (Egg nodes cannot be dual-parented). Preview and baker pass `write_combined=False`; converter CLI still writes combined for pview. |
 | `_write_egg(path, groups)` | `converter/scene_builder.py` | One-file EggData writer used by the four parts. |
-| `local_basisu_binary()` | `renderer/convert_to_jpeg.py` | `passages_tool/bin/basisu[.exe]` (`Path(__file__).parents[3]`). Drop the encoder there; `bake.bat` still does not chain the transcoder. |
+| `local_basisu_binary()` | `renderer/convert_to_jpeg.py` | `TOOL_ROOT/bin/basisu[.exe]`. Drop the encoder there; `bake.bat` still does not chain the transcoder. |
 | `_manifest_edge_entries(manifest)` | `renderer/convert_to_jpeg.py` | v2 nested `edges` plus legacy flat manifests. |
-| `PassagesApp._hist(key=None)` | `main.py` | Snapshot undo. Repeating `key` coalesces slider/drag/meta edits; `key=None` always pushes. |
-| `PassagesApp._imgui_wants_keyboard()` | `main.py` | Gates `s/w/a/e/r/g/v`, Delete, Enter, Esc, snap, Validate. Ctrl+S still saves while typing. |
-| `PassagesApp._select_at(wx, wz, mx, my)` | `main.py` | Screen-space vertex pick (`PICK_RADIUS_PX`) starts a drag; edge pick (NDC point-to-segment) selects. |
-| `_point_seg_dist2` | `main.py` | NDC distance² from mouse to a segment. |
-| `_convert_polyline_type(pl, new_type)` | `main.py` | After a yes/no dialog: arch/anchor keep vertex 0 and drop intervals/edges; wall drops edges; eyepath drops intervals. |
+| `PassagesApp._hist(key=None)` | `app/commands.py` | Snapshot undo. Repeating `key` coalesces slider/drag/meta edits; `key=None` always pushes. |
+| `PassagesApp._imgui_wants_keyboard()` | `app/input.py` | Gates `s/w/a/e/r/g/v`, Delete, Enter, Esc, snap, Validate. Ctrl+S still saves while typing. |
+| `PassagesApp._select_at(wx, wz, mx, my)` | `app/input.py` | Screen-space vertex pick (`PICK_RADIUS_PX`) starts a drag; edge pick (NDC point-to-segment) selects. |
+| `_point_seg_dist2` | `app/input.py` | NDC distance² from mouse to a segment. |
+| `convert_polyline_type(pl, new_type)` | `app/commands.py` | After a yes/no dialog: arch/anchor keep vertex 0 and drop intervals/edges; wall drops edges; eyepath drops intervals. |
+| `ViewpointRenderer._render_camera` | `renderer/viewpoint_renderer.py` | Shared offscreen camera + headlight + PNG write. |
+| `get_logger` / `configure_cli` | `log.py` | Shared logging. |
+| `TOOL_ROOT` / `EDITOR_STATE_PATH` | `config.py` | Tool checkout root (not `src/`). |
 | `ViewportCamera.film_h`, `.win_w`, `.win_h` | `viewport/camera.py` | Resize-aware film and pick math. `_on_window_event` ignores offscreen buffers (`window != self.win`). |
 | `BackgroundGrid.rebuild(..., cell=)` | `viewport/grid.py` | Minor spacing from `meta.snap_grid`; doubles `cell` if more than ~240 lines would be drawn. `Level.grid.cell_size` is still serialized and unused. |
 | Editor state | `editor_state.json` (gitignored, tool root) | Remembers last texture directory. First launch scans `assets/sample_textures` if present. Texture scan is recursive (`relative/posix` names). |
 
 Dirty tracking: `PassagesApp._saved_snapshot` + `_capture_saved` / `_refresh_dirty`. Do not trust `Level.from_dict().dirty` after undo.
 
-Preview: `TOOL_ROOT / "temp_preview"` (`main.py` `parents[2]`). `ViewpointRenderer` does **not** reparent the 3D scene onto the editor `render`.
+Preview: `TOOL_ROOT / "temp_preview"`. `ViewpointRenderer` does **not** reparent the 3D scene onto the editor `render`.
 
 ---
 
@@ -211,35 +214,45 @@ Config, baker `--height` help, README sample, user guide, and rendering-design t
 
 ## 5. P2 — architecture
 
-All **open** except as noted.
+### 5.1 `main.py` is the application — **done**
 
-### 5.1 `main.py` is the application — **open**
+`PassagesApp` stays in `main.py` (ShowBase init, ImGui, grid/title). Mixins:
 
-Now larger (~1000 lines) after P0/P1. Split is still valid: input, commands, preview. Do not split as a drive-by; it is a dedicated PR.
+| Mixin | Path | Role |
+|---|---|---|
+| `InputMixin` | `app/input.py` | mouse/keyboard, draw, pick, snap, Validate |
+| `CommandsMixin` | `app/commands.py` | file, undo, properties callbacks, history |
+| `PreviewMixin` | `app/preview.py` | in-editor 3D peek |
+
+Helpers `_point_seg_dist2` and `convert_polyline_type` live next to those mixins. Tests: `tests/test_app_helpers.py`.
 
 ### 5.2 One `Polyline` dataclass for four types — **open**
 
-`_convert_polyline_type` papers over illegal in-memory states. A union type is still the long-term fix.
+`convert_polyline_type` papers over illegal in-memory states. A union type is still the long-term fix.
 
 ### 5.3 Repeated “find the EyePath” loops — **done** (first-path policy remains)
 
 `Level.eyepaths()`, `walls()`, `anchors()` exist. Manifest, baker, occluder, and viewpoint renderer use them (still first EyePath only).
 
-### 5.4 `render_edge` / `render_midpoint` copies — **open**
+### 5.4 `render_edge` / `render_midpoint` copies — **done**
 
-Near/far/headlight now share config, but the two methods are still duplicated. A `_render_camera(pos, look_at, path)` is remaining.
+`ViewpointRenderer._render_camera(pos, look_at, path, …)` owns buffer/lens/headlight/screenshot. `render_edge` looks from the start vertex; `render_midpoint` from the geometric 50% point. Placement is unchanged.
 
 ### 5.5 Converter `EggContext` vs raw `EggData` — **open**
 
 `_write_egg` is a small step. Texture nodes still may not be `add_child`’d onto EggData.
 
-### 5.6 Tiles are dead — **open**
+### 5.6 Tiles are dead — **done**
 
-### 5.7 Logging is `print` — **open**
+`Tile` / `set_tile` / `get_tile` removed. `from_dict` ignores a legacy `tiles` key; `to_dict` does not write it. Floor-cell tiles were never used by the viewport or baker.
 
-### 5.8 Generated / local junk — **partial**
+### 5.7 Logging is `print` — **done**
 
-`editor_state.json` and `.venv_uv/` are gitignored. Nested `.git` vs monorepo overlay is the established publish path. `pyproject.toml` package-data `assets/**` / `icons/**` still point at the wrong place.
+`passages_tool.log`: `get_logger`, `configure_cli` (INFO→stdout, WARNING+→stderr, message-only), `configure_editor`. Editor and CLIs use it. CLI output text is unchanged aside from a dropped extra blank line before midpoint baking.
+
+### 5.8 Generated / local junk — **done**
+
+`editor_state.json` and `.venv_uv/` are gitignored. Nested `.git` vs monorepo overlay is the established publish path. Wrong `pyproject.toml` package-data globs (`assets/**`, `icons/**` inside the Python package) removed. `TOOL_ROOT` / `EDITOR_STATE_PATH` live in `config.py`.
 
 ---
 
@@ -276,7 +289,7 @@ Near/far/headlight now share config, but the two methods are still duplicated. A
 
 | Gap | Why |
 |---|---|
-| Dirty-after-undo in `PassagesApp` | 2.3 lives only in `main.py` |
+| Dirty-after-undo in `PassagesApp` | 2.3 lives in `app/commands.py`; still needs a ShowBase harness |
 | Wall-builder closing-edge UV vs validator | Agreement is via shared helper; no UV assertion |
 | `main.py` pick/drag, ImGui capture, resize | Manual checklist in the user guide is enough unless a headless smoke is added |
 | `test_webp_mislabeled_as_png` in `test_validator.py` | Wrong file; move when touching tests |
@@ -308,7 +321,9 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 
 P0, core P1, docs pass, per-room floors, and small leftovers are done. Geometric midpoints kept.
 
-Next: **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles. Feature 11 (yaw-strip slew) is a minigame+baker project, not a leftover. Feature 12 (HiDPI / adjustable editor text) is editor-only and not implemented.
+P2 splits (5.1, 5.4, 5.6, 5.7, 5.8) are done. Remaining P2: **5.2** union polyline type, **5.5** EggContext texture parenting.
+
+Next: Feature 11 (yaw-strip slew) is a minigame+baker project. Feature 12 (HiDPI / adjustable editor text) is editor-only and not implemented.
 
 ---
 
@@ -316,7 +331,7 @@ Next: **P2 splits** — `main.py` modules, `_render_camera` helper, logging, til
 
 | Area | Paths |
 |---|---|
-| App shell | `src/passages_tool/main.py` |
+| App shell | `src/passages_tool/main.py`, `app/input.py`, `app/commands.py`, `app/preview.py`, `log.py` |
 | Document | `src/passages_tool/editor/level.py`, `history.py`, `validator.py`, `arch_utils.py` |
 | Viewport gfx | `src/passages_tool/editor/polyline.py`, `viewport/camera.py`, `viewport/grid.py` |
 | UI | `src/passages_tool/ui/toolbar.py`, `properties.py`, `palette.py` |
