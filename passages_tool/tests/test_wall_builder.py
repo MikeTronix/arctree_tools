@@ -157,6 +157,23 @@ def test_wall_normals(tmp_path):
         assert nz == pytest.approx(0.0)
 
 
+def _floor_area(level, tmp_path) -> float:
+    floor_grp = build_floor(level, texture_dir=tmp_path)
+    total = 0.0
+    for poly in get_egg_polygons(floor_grp):
+        verts = get_polygon_vertices(poly)
+        assert len(verts) == 3
+        pt0 = (verts[0]["pos"][0], verts[0]["pos"][1])
+        pt1 = (verts[1]["pos"][0], verts[1]["pos"][1])
+        pt2 = (verts[2]["pos"][0], verts[2]["pos"][1])
+        assert is_ccw(pt0, pt1, pt2)
+        for v in verts:
+            assert v["normal"] == pytest.approx((0.0, 0.0, 1.0))
+            assert v["pos"][2] == pytest.approx(0.0)
+        total += polygon_area([pt0, pt1, pt2])
+    return total
+
+
 def test_floor_ceiling_triangulation(tmp_path):
     level = Level()
     level.meta.wall_height = 3.0
@@ -164,72 +181,66 @@ def test_floor_ceiling_triangulation(tmp_path):
     level.meta.floor_texture = "floor.png"
     level.meta.ceiling_texture = "ceiling.png"
 
-    # Outer wall loop (CCW): 4x4 square
-    outer = Polyline.make_wall()
-    outer.closed = True
-    outer.vertices = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)]
-    outer.texture_intervals = [
+    room = Polyline.make_wall()
+    room.closed = True
+    room.vertices = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)]
+    room.texture_intervals = [
         TextureInterval(from_vertex=0, to_vertex=3, texture="wall.png")
     ]
-    level.add_polyline(outer)
+    level.add_polyline(room)
 
-    # Inner column hole (CW): 1x1 square
-    hole = Polyline.make_wall()
-    hole.closed = True
-    hole.vertices = [(1.0, 1.0), (1.0, 2.0), (2.0, 2.0), (2.0, 1.0)]
-    hole.texture_intervals = [
-        TextureInterval(from_vertex=0, to_vertex=3, texture="wall.png")
-    ]
-    level.add_polyline(hole)
+    assert _floor_area(level, tmp_path) == pytest.approx(16.0)
 
-    # 1. Test Floor
-    floor_grp = build_floor(level, texture_dir=tmp_path)
-    floor_polys = get_egg_polygons(floor_grp)
-
-    # Area is 16 - 1 = 15. The triangles should sum to 15.0 area
-    total_floor_area = 0.0
-    for poly in floor_polys:
-        verts = get_polygon_vertices(poly)
-        assert len(verts) == 3  # Triangles
-
-        # Check winding: Floor must be CCW (normal points up)
-        pt0 = (verts[0]["pos"][0], verts[0]["pos"][1])
-        pt1 = (verts[1]["pos"][0], verts[1]["pos"][1])
-        pt2 = (verts[2]["pos"][0], verts[2]["pos"][1])
-        assert is_ccw(pt0, pt1, pt2)
-
-        # Normal must point up (0, 0, 1)
-        for v in verts:
-            assert v["normal"] == pytest.approx((0.0, 0.0, 1.0))
-            assert v["pos"][2] == pytest.approx(0.0)
-
-        total_floor_area += polygon_area([pt0, pt1, pt2])
-
-    assert total_floor_area == pytest.approx(15.0)
-
-    # 2. Test Ceiling
     ceil_grp = build_ceiling(level, texture_dir=tmp_path)
-    ceil_polys = get_egg_polygons(ceil_grp)
-
     total_ceil_area = 0.0
-    for poly in ceil_polys:
+    for poly in get_egg_polygons(ceil_grp):
         verts = get_polygon_vertices(poly)
         assert len(verts) == 3
-
-        # Check winding: Ceiling must be CW (normal points down)
         pt0 = (verts[0]["pos"][0], verts[0]["pos"][1])
         pt1 = (verts[1]["pos"][0], verts[1]["pos"][1])
         pt2 = (verts[2]["pos"][0], verts[2]["pos"][1])
         assert not is_ccw(pt0, pt1, pt2)
-
-        # Normal must point down (0, 0, -1) and Z = wall_height
         for v in verts:
             assert v["normal"] == pytest.approx((0.0, 0.0, -1.0))
             assert v["pos"][2] == pytest.approx(3.0)
-
         total_ceil_area += polygon_area([pt0, pt1, pt2])
+    assert total_ceil_area == pytest.approx(16.0)
 
-    assert total_ceil_area == pytest.approx(15.0)
+
+def test_floor_two_disjoint_rooms(tmp_path):
+    """Each closed wall is its own room floor; the smaller is not a hole."""
+    level = Level()
+    level.meta.floor_texture = "floor.png"
+
+    a = Polyline.make_wall()
+    a.closed = True
+    a.vertices = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)]
+    level.add_polyline(a)
+
+    b = Polyline.make_wall()
+    b.closed = True
+    b.vertices = [(10.0, 0.0), (12.0, 0.0), (12.0, 2.0), (10.0, 2.0)]
+    level.add_polyline(b)
+
+    assert _floor_area(level, tmp_path) == pytest.approx(16.0 + 4.0)
+
+
+def test_nested_closed_walls_both_get_floors(tmp_path):
+    """Nested loops are overlapping rooms, not a courtyard hole."""
+    level = Level()
+    level.meta.floor_texture = "floor.png"
+
+    outer = Polyline.make_wall()
+    outer.closed = True
+    outer.vertices = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)]
+    level.add_polyline(outer)
+
+    inner = Polyline.make_wall()
+    inner.closed = True
+    inner.vertices = [(1.0, 1.0), (2.0, 1.0), (2.0, 2.0), (1.0, 2.0)]
+    level.add_polyline(inner)
+
+    assert _floor_area(level, tmp_path) == pytest.approx(16.0 + 1.0)
 
 
 def test_floor_ceiling_geometrically_closed_wall(tmp_path):

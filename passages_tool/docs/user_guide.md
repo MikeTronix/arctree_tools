@@ -333,7 +333,7 @@ REM Optional KTX2 / JPEG
 .venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
 ```
 
-Bake uses the first EyePath. Midpoint frames are the geometric 50% of each undirected edge. Floor triangulation treats the largest closed wall as the outer loop and other closed walls as holes — two separate rooms will not each get a floor.
+Bake uses the first EyePath. Midpoint frames are the geometric 50% of each undirected edge. Each **closed** wall gets its own floor and ceiling (a room). Open walls get none. Nested or overlapping closed walls both fill — that is an authoring error, not a courtyard hole.
 
 ---
 

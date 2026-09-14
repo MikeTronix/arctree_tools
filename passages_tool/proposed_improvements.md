@@ -20,7 +20,7 @@ Status: **done** · **partial** · **open**
 |---|---|---|
 | §2 P0 correctness / data-loss | **done** | Nested `b9011b6`; GitHub `6ed69e8` |
 | §3 P1 editor interaction | **done** (3.13 typed issues still **partial**) | Nested `f07a0e3`; GitHub `b9f5b0a` |
-| §4 P1 bake / converter | **partial** | Core plumbing done; 4.3 and 4.8 left as forks; 4.2 combined `scene.egg` still a second CLI pass |
+| §4 P1 bake / converter | **partial** | Per-room floors done; 4.3 midpoint camera still a fork; 4.2 combined `scene.egg` still a second CLI pass |
 | §5 P2 architecture | **open** | `Level.eyepaths()` landed as a side effect of 4.1 |
 | §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat` cds to its folder; rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
@@ -201,9 +201,9 @@ Named constants in `config.py`, used by `ViewpointRenderer` and `setup_lighting`
 
 Add is rejected; Validate warns. A v2 file that already contains overlaps still loads; remaining: strip or error in `Level.from_dict`.
 
-### 4.8 Floor = largest loop + holes — **open** (design fork; documented)
+### 4.8 Floor = largest loop + holes — **done** (per-room floors)
 
-`build_triangulated_polygons` docstring states the limitation. Two disjoint closed rooms still punch a hole in the larger one. Remaining: per-loop floors or a union. Do not “fix” silently — it changes every multi-room bake.
+Each closed wall is triangulated on its own (`_triangulate_loop`). Open walls contribute no floor. Nested loops both fill (authoring overlap; no pit/courtyard holes — Passages has no stairs/ramps). Bbox fallback only if nothing triangulates. Tests: `test_floor_two_disjoint_rooms`, `test_nested_closed_walls_both_get_floors`.
 
 ### 4.9 CLI help / defaults disagree — **done**
 
@@ -309,11 +309,10 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 P0, core P1, and the docs pass are done. Next, if continuing this list:
 
 1. **Decide 4.3 bake camera** — keep geometric midpoints (current) or cap travel using `arch_view_angle()`. Shared math is done; switching cameras is content-visible.
-2. **Decide 4.8** — keep largest-loop+holes (documented) or per-room floors. Content-visible.
-3. **Small leftovers** — typed Validate issues (3.13), `from_dict` overlap error (4.7), chain KTX2 in `bake.bat` (4.4), `grid.cell_size` (3.3), `walls()`/`anchors()` (5.3).
-4. **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles.
+2. **Small leftovers** — typed Validate issues (3.13), `from_dict` overlap error (4.7), chain KTX2 in `bake.bat` (4.4), `grid.cell_size` (3.3), `walls()`/`anchors()` (5.3).
+3. **P2 splits** — `main.py` modules, `_render_camera` helper, logging, tiles.
 
-Do not start items 1 or 2 without an explicit product choice.
+Do not start item 1 without an explicit product choice.
 
 ---
 

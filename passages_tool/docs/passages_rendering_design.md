@@ -9,7 +9,7 @@
 > - `fov_h` is derived from `fov_v` × render aspect (`2 * atan(aspect * tan(fov_v/2))`). Author VFOV and resolution only. Default bake **1024×576**, VFOV 60° → HFOV ≈ **91.5°**.
 > - Texture scale is `pixels_per_meter` (legacy `texture_pixel_size` migrates).
 > - EyePath `edges` are **directed** `[from, to]`. Bake/preview use the **first** EyePath.
-> - Floor/ceiling are triangulated from closed wall loops (largest loop = outer, others = holes), not a single bounding-box quad.
+> - Floor/ceiling: **one fill per closed wall loop** (a room). Open walls get none. Nested loops both fill (authoring overlap, not a hole). Bounding-box quad only if no closed wall triangulates.
 > - Anchor visibility: occlusion is baked per **eyepoint** (CPU ray + arch alpha); FOV/frustum is applied at **runtime**. See `design_docs/passages_anchor_visibility_bake_06JUL26.md`.
 > - Midpoint frames are the geometric 50% of the edge (the “no edge-on arches mid-move” cap is not applied at bake).
 > - Editor how-to: `docs/user_guide.md`.
@@ -192,8 +192,8 @@ sprite_count:      int             # Expected number of sprites allowed at this 
 
 ### 5.1 Floor
 
-- Triangulated from **closed Wall** loops at Z = 0 (bounding-box quad is a fallback if triangulation fails).
-- The largest closed loop is the outer boundary; every other closed wall is treated as a **hole**. Two disjoint rooms therefore do **not** each get a floor (documented limitation).
+- One triangulated fill per **closed Wall** loop at Z = 0 (a room). Bounding-box quad only if no closed loop triangulates.
+- Nested or overlapping closed walls both get a fill (z-fight) — treat that as an authoring mistake, not a courtyard/pit. Passages has no stairs, ramps, or holes in the floor.
 - UV-mapped using `pixels_per_meter` from `floor_texture`.
 - No perturbations; always perfectly flat.
 

@@ -5,6 +5,7 @@ Generates triangulated floor and ceiling geometries (.egg) connecting to walls.
 """
 from __future__ import annotations
 
+import math
 from pathlib import Path
 from typing import Optional
 
@@ -74,7 +75,73 @@ def build_bbox_fallback(
         return [ctx.add_polygon([v_bl, v_br, v_tr, v_tl], egg_tex)]
 
 
-import math
+def _is_wall_closed(pl: Polyline) -> bool:
+    if pl.type != PolylineType.WALL or len(pl.vertices) < 3:
+        return False
+    if pl.closed:
+        return True
+    return math.dist(pl.vertices[0], pl.vertices[-1]) < 1e-4
+
+
+def _loop_vertices(pl: Polyline) -> list[tuple[float, float]]:
+    verts = list(pl.vertices)
+    if len(verts) >= 2 and math.dist(verts[0], verts[-1]) < 1e-4:
+        verts.pop()
+    return verts
+
+
+def _triangulate_loop(
+    ctx: EggContext,
+    loop: list[tuple[float, float]],
+    z_val: float,
+    normal: tuple[float, float, float],
+    tex_w: int,
+    tex_h: int,
+    egg_tex,
+    ppm: float,
+) -> list[EggPolygon]:
+    """Fill one simple closed loop. Empty if triangulation fails."""
+    if len(loop) < 3:
+        return []
+
+    t = Triangulator()
+    egg_verts: dict[int, EggVertex] = {}
+    for vx, vy in loop:
+        idx = t.add_vertex(vx, vy)
+        u = (vx * ppm) / tex_w
+        v = (vy * ppm) / tex_h
+        egg_verts[idx] = ctx.add_vertex(vx, vy, z_val, u, v, normal)
+        t.add_polygon_vertex(idx)
+
+    try:
+        t.triangulate()
+    except Exception:
+        return []
+
+    num_tris = t.get_num_triangles()
+    if num_tris == 0:
+        return []
+
+    polys: list[EggPolygon] = []
+    for i in range(num_tris):
+        idx0 = t.get_triangle_v0(i)
+        idx1 = t.get_triangle_v1(i)
+        idx2 = t.get_triangle_v2(i)
+        ev0, ev1, ev2 = egg_verts[idx0], egg_verts[idx1], egg_verts[idx2]
+        p0: LPoint2d = t.get_vertex(idx0)
+        p1: LPoint2d = t.get_vertex(idx1)
+        p2: LPoint2d = t.get_vertex(idx2)
+        pt0 = (p0.get_x(), p0.get_y())
+        pt1 = (p1.get_x(), p1.get_y())
+        pt2 = (p2.get_x(), p2.get_y())
+        ccw = is_ccw(pt0, pt1, pt2)
+        if normal[2] > 0:
+            tri_verts = [ev0, ev1, ev2] if ccw else [ev0, ev2, ev1]
+        else:
+            tri_verts = [ev0, ev2, ev1] if ccw else [ev0, ev1, ev2]
+        polys.append(ctx.add_polygon(tri_verts, egg_tex))
+    return polys
+
 
 def build_triangulated_polygons(
     ctx: EggContext,
@@ -85,115 +152,28 @@ def build_triangulated_polygons(
     tex_h: int,
     egg_tex: Optional[EggPolygon],
 ) -> list[EggPolygon]:
-    """Triangulate the level floor/ceiling boundary using closed wall loops.
+    """One floor/ceiling fill per closed wall loop (a room).
 
-    Limitation: the largest closed wall is the outer boundary and every other
-    closed wall is treated as a hole. Separate rooms (two disjoint closed
-    loops) therefore punch a hole in the larger room instead of producing two
-    floors. Author one outer loop, or keep rooms as a single polyline.
+    Closed = `pl.closed` or first vertex coincides with last. Open walls
+    contribute no floor. Nested/overlapping loops both get a fill — that is
+    an authoring error (z-fight), not treated as a hole. Passages has no
+    pits or courtyards.
     """
-    # Find all closed wall polylines (either marked closed or geometrically closed)
-    def is_wall_closed(pl: Polyline) -> bool:
-        if pl.type != PolylineType.WALL or len(pl.vertices) < 3:
-            return False
-        if pl.closed:
-            return True
-        return math.dist(pl.vertices[0], pl.vertices[-1]) < 1e-4
-
-    closed_walls = [
-        pl
-        for pl in level.polylines.values()
-        if is_wall_closed(pl)
-    ]
-
+    closed_walls = [pl for pl in level.polylines.values() if _is_wall_closed(pl)]
     if not closed_walls:
-        # Fallback to bbox quad if no closed wall loop exists
         return build_bbox_fallback(ctx, level, z_val, normal, tex_w, tex_h, egg_tex)
 
-    # Outermost wall is the one with the largest 2D area
-    outer_wall = max(closed_walls, key=lambda pl: polygon_area(pl.vertices))
-    hole_walls = [pl for pl in closed_walls if pl != outer_wall]
-
-    # Initialize Triangulator
-    t = Triangulator()
     ppm = level.meta.pixels_per_meter
-
-    # Keep a dictionary of vertex index to its 3D coordinate/UV vertex object
-    egg_verts: dict[int, EggVertex] = {}
-
-    def get_or_add_egg_vertex(vx: float, vy: float) -> int:
-        # Add vertex to the Triangulator pool
-        idx = t.add_vertex(vx, vy)
-        if idx not in egg_verts:
-            # Map layout coordinate to U, V
-            u = (vx * ppm) / tex_w
-            v = (vy * ppm) / tex_h
-            egg_verts[idx] = ctx.add_vertex(vx, vy, z_val, u, v, normal)
-        return idx
-
-    # Add outer boundary
-    outer_verts = list(outer_wall.vertices)
-    if len(outer_verts) >= 2 and math.dist(outer_verts[0], outer_verts[-1]) < 1e-4:
-        outer_verts.pop()
-
-    for vx, vy in outer_verts:
-        idx = get_or_add_egg_vertex(vx, vy)
-        t.add_polygon_vertex(idx)
-
-    # Add holes
-    for hw in hole_walls:
-        t.begin_hole()
-        hw_verts = list(hw.vertices)
-        if len(hw_verts) >= 2 and math.dist(hw_verts[0], hw_verts[-1]) < 1e-4:
-            hw_verts.pop()
-        for vx, vy in hw_verts:
-            idx = get_or_add_egg_vertex(vx, vy)
-            t.add_hole_vertex(idx)
-
-    # Perform triangulation
-    try:
-        t.triangulate()
-    except Exception:
-        # Triangulation failed (e.g. self-intersecting path), fallback to bbox
-        return build_bbox_fallback(ctx, level, z_val, normal, tex_w, tex_h, egg_tex)
-
-    num_tris = t.get_num_triangles()
-    if num_tris == 0:
-        return build_bbox_fallback(ctx, level, z_val, normal, tex_w, tex_h, egg_tex)
-
     polys: list[EggPolygon] = []
-    for i in range(num_tris):
-        idx0 = t.get_triangle_v0(i)
-        idx1 = t.get_triangle_v1(i)
-        idx2 = t.get_triangle_v2(i)
+    for pl in closed_walls:
+        polys.extend(
+            _triangulate_loop(
+                ctx, _loop_vertices(pl), z_val, normal, tex_w, tex_h, egg_tex, ppm
+            )
+        )
 
-        ev0 = egg_verts[idx0]
-        ev1 = egg_verts[idx1]
-        ev2 = egg_verts[idx2]
-
-        # Check winding direction of triangle in 2D space
-        # get_vertex returns LPoint2d
-        p0: LPoint2d = t.get_vertex(idx0)
-        p1: LPoint2d = t.get_vertex(idx1)
-        p2: LPoint2d = t.get_vertex(idx2)
-
-        pt0 = (p0.get_x(), p0.get_y())
-        pt1 = (p1.get_x(), p1.get_y())
-        pt2 = (p2.get_x(), p2.get_y())
-
-        ccw = is_ccw(pt0, pt1, pt2)
-
-        # Re-wind to match requirements
-        if normal[2] > 0:
-            # Floor: wants CCW
-            tri_verts = [ev0, ev1, ev2] if ccw else [ev0, ev2, ev1]
-        else:
-            # Ceiling: wants CW
-            tri_verts = [ev0, ev2, ev1] if ccw else [ev0, ev1, ev2]
-
-        poly = ctx.add_polygon(tri_verts, egg_tex)
-        polys.append(poly)
-
+    if not polys:
+        return build_bbox_fallback(ctx, level, z_val, normal, tex_w, tex_h, egg_tex)
     return polys
 
 
