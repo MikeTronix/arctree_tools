@@ -42,6 +42,7 @@ def test_fixed_arch_quad(tmp_path):
 
     polys = get_egg_polygons(grp)
     assert len(polys) == 1
+    assert polys[0].get_bface_flag() is True
 
     verts = get_polygon_vertices(polys[0])
     assert len(verts) == 4
@@ -102,6 +103,7 @@ def test_billboard_arch(tmp_path):
 
     # Verify local vertices are centered at X = -1.5 to 1.5, Y = 0
     polys = get_egg_polygons(grp)
+    assert polys[0].get_bface_flag() is True
     verts = get_polygon_vertices(polys[0])
 
     xs = [v["pos"][0] for v in verts]
@@ -233,3 +235,67 @@ def test_setup_lighting():
 
     assert ambient_found
     assert point_found
+
+
+def test_snapped_and_sliced_arches(tmp_path):
+    # 1. Create a level with parallel walls at X = 0.0 and X = 6.0
+    level = Level()
+    level.meta.wall_height = 4.0
+    level.meta.pixels_per_meter = 256.0
+
+    wall1 = Polyline.make_wall()
+    wall1.vertices = [(0.0, 0.0), (0.0, 10.0)]
+    level.add_polyline(wall1)
+
+    wall2 = Polyline.make_wall()
+    wall2.vertices = [(6.0, 0.0), (6.0, 10.0)]
+    level.add_polyline(wall2)
+
+    # 2. Add an arch with auto_snap = True, off-center at X = 2.0, orientation = 90
+    pl = Polyline.make_arch((2.0, 5.0))
+    pl.orientation = 90.0
+    pl.auto_snap = True
+    pl.texture = "test_nslice.png"
+    level.add_polyline(pl)
+
+    # 3. Create a sidecar arch config JSON
+    import json
+    cfg = {
+        "texture": "test_nslice.png",
+        "texture_width": 512,
+        "texture_height": 512,
+        "pillar_l_width_px": 128,
+        "pillar_r_width_px": 128,
+        "keystone_width_px": 64,
+        "tile_width_px": 96,
+        "nominal_pillar_l_width_m": 0.5,
+        "nominal_pillar_r_width_m": 0.5,
+        "nominal_keystone_width_m": 0.25,
+        "nominal_tile_width_m": 0.375
+    }
+    with open(tmp_path / "test_nslice.arch.json", "w") as f:
+        json.dump(cfg, f)
+
+    # 4. Build arches
+    groups = build_arches(level, texture_dir=tmp_path)
+    assert len(groups) == 1
+    grp = groups[0]
+
+    # Verify that the arch snapped and centered at X = 3.0
+    # It has 1 (Left Pillar) + 6 (Left Band) + 1 (Keystone) + 6 (Right Band) + 1 (Right Pillar) = 15 quads
+    polys = get_egg_polygons(grp)
+    assert len(polys) == 15
+
+    # Find the left-most polygon (minimum X coordinate) and right-most polygon (maximum X coordinate)
+    all_poly_bounds = []
+    for poly in polys:
+        verts = get_polygon_vertices(poly)
+        xs = [v["pos"][0] for v in verts]
+        all_poly_bounds.append((min(xs), max(xs)))
+
+    # Left-most pillar should span from 0.0 to 0.5
+    assert any(b[0] == pytest.approx(0.0) and b[1] == pytest.approx(0.5) for b in all_poly_bounds)
+
+    # Right-most pillar should span from 5.5 to 6.0
+    assert any(b[0] == pytest.approx(5.5) and b[1] == pytest.approx(6.0) for b in all_poly_bounds)
+

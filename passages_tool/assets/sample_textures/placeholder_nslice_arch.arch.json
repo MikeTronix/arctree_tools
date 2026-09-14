@@ -1,0 +1,13 @@
+{
+  "texture": "placeholder_nslice_arch.png",
+  "texture_width": 512,
+  "texture_height": 512,
+  "pillar_l_width_px": 128,
+  "pillar_r_width_px": 128,
+  "keystone_width_px": 64,
+  "tile_width_px": 96,
+  "nominal_pillar_l_width_m": 0.5,
+  "nominal_pillar_r_width_m": 0.5,
+  "nominal_keystone_width_m": 0.25,
+  "nominal_tile_width_m": 0.375
+}

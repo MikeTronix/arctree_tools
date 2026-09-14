@@ -80,6 +80,7 @@ class PolylineNode:
         render_root: NodePath,
         data: Polyline,
         selected: bool = False,
+        level: Optional[Level] = None,
     ) -> None:
         self._root     = render_root
         self._data     = data
@@ -91,11 +92,11 @@ class PolylineNode:
         self._geo_np:    Optional[NodePath] = None
         self._handle_nps: list[NodePath]    = []
 
-        self.rebuild()
+        self.rebuild(level)
 
     # ── Public API ────────────────────────────────────────────────────────────
 
-    def rebuild(self) -> None:
+    def rebuild(self, level: Optional[Level] = None) -> None:
         """Destroy and recreate all scene objects from self._data."""
         self._destroy_scene()
 
@@ -109,7 +110,7 @@ class PolylineNode:
         if t == PolylineType.WALL:
             self._build_wall()
         elif t == PolylineType.ARCH:
-            self._build_arch()
+            self._build_arch(level)
         elif t == PolylineType.EYEPATH:
             self._build_eyepath()
         elif t == PolylineType.ANCHOR:
@@ -202,7 +203,7 @@ class PolylineNode:
                 hnp = self._geo_np.attachNewNode(hsegs.create(dynamic=True))
                 hnp.setBin("opaque", 1)
 
-    def _build_arch(self) -> None:
+    def _build_arch(self, level: Optional[Level] = None) -> None:
         verts = self._data.vertices
         if not verts:
             return
@@ -215,33 +216,61 @@ class PolylineNode:
         segs.setThickness(POLYLINE_THICKNESS)
         segs.setColor(LColor(*color))
 
-        if self._data.orientation == "billboard":
-            # Horizontal bar
-            segs.moveTo(px - half_w, 0, pz)
-            segs.drawTo(px + half_w, 0, pz)
-            # Four short "sweep" spokes radiating from centre — indicates
-            # the arch can rotate to face the camera.
-            spoke_r = min(half_w * 0.55, 0.4)
-            for deg in (45, 135, 225, 315):
-                rad = math.radians(deg)
-                sx, sz = math.cos(rad) * spoke_r, math.sin(rad) * spoke_r
-                segs.moveTo(px, 0, pz)
-                segs.drawTo(px + sx, 0, pz + sz)
-        else:
-            # Bar perpendicular to the facing orientation angle
-            ang = math.radians(float(self._data.orientation) + 90.0)
-            dx  = math.cos(ang) * half_w
-            dz  = math.sin(ang) * half_w
-            segs.moveTo(px - dx, 0, pz - dz)
-            segs.drawTo(px + dx, 0, pz + dz)
+        is_billboard = (self._data.orientation == "billboard")
+        auto_snap = getattr(self._data, "auto_snap", False) and not is_billboard and level is not None
 
-            # Ticks at each end run parallel to normal (facing angle)
-            cap  = HATCH_LENGTH * 0.6
-            pdx  = -math.sin(ang) * cap
-            pdz  =  math.cos(ang) * cap
-            for ex, ez in ((px - dx, pz - dz), (px + dx, pz + dz)):
-                segs.moveTo(ex - pdx, 0, ez - pdz)
-                segs.drawTo(ex + pdx, 0, ez + pdz)
+        if auto_snap:
+            try:
+                from passages_tool.converter.arch_builder import find_snap_points
+                try:
+                    theta_deg = float(self._data.orientation)
+                except ValueError:
+                    theta_deg = 0.0
+                p_l, p_r, _, _, _ = find_snap_points(level, (px, pz), theta_deg)
+
+                # Draw dynamic snap bar stretching between wall snap points
+                segs.moveTo(p_l[0], 0, p_l[1])
+                segs.drawTo(p_r[0], 0, p_r[1])
+
+                # Draw perpendicular ticks at snapped ends
+                ang = math.radians(theta_deg + 90.0)
+                cap = HATCH_LENGTH * 0.6
+                pdx = -math.sin(ang) * cap
+                pdz = math.cos(ang) * cap
+                for ex, ez in (p_l, p_r):
+                    segs.moveTo(ex - pdx, 0, ez - pdz)
+                    segs.drawTo(ex + pdx, 0, ez + pdz)
+            except Exception:
+                auto_snap = False
+
+        if not auto_snap:
+            if is_billboard:
+                # Horizontal bar
+                segs.moveTo(px - half_w, 0, pz)
+                segs.drawTo(px + half_w, 0, pz)
+                # Four short "sweep" spokes radiating from centre — indicates
+                # the arch can rotate to face the camera.
+                spoke_r = min(half_w * 0.55, 0.4)
+                for deg in (45, 135, 225, 315):
+                    rad = math.radians(deg)
+                    sx, sz = math.cos(rad) * spoke_r, math.sin(rad) * spoke_r
+                    segs.moveTo(px, 0, pz)
+                    segs.drawTo(px + sx, 0, pz + sz)
+            else:
+                # Bar perpendicular to the facing orientation angle
+                ang = math.radians(float(self._data.orientation) + 90.0)
+                dx  = math.cos(ang) * half_w
+                dz  = math.sin(ang) * half_w
+                segs.moveTo(px - dx, 0, pz - dz)
+                segs.drawTo(px + dx, 0, pz + dz)
+
+                # Ticks at each end run parallel to normal (facing angle)
+                cap  = HATCH_LENGTH * 0.6
+                pdx  = -math.sin(ang) * cap
+                pdz  =  math.cos(ang) * cap
+                for ex, ez in ((px - dx, pz - dz), (px + dx, pz + dz)):
+                    segs.moveTo(ex - pdx, 0, ez - pdz)
+                    segs.drawTo(ex + pdx, 0, ez + pdz)
 
         np = self._geo_np.attachNewNode(segs.create(dynamic=True))
         np.setBin("opaque", 1)
@@ -414,6 +443,7 @@ class PolylineManager:
         self._root:  NodePath = render_root
         self._nodes: dict[str, PolylineNode] = {}
         self._selected_id: Optional[str] = None
+        self.level: Optional[Level] = None
 
     # ── Sync ──────────────────────────────────────────────────────────────────
 
@@ -431,18 +461,18 @@ class PolylineManager:
         for pid in new_ids - existing_ids:
             pdata = level_polylines[pid]
             self._nodes[pid] = PolylineNode(
-                self._root, pdata, selected=(pid == self._selected_id)
+                self._root, pdata, selected=(pid == self._selected_id), level=self.level
             )
 
     def rebuild_one(self, polyline_id: str) -> None:
         """Rebuild scene geometry for a single polyline after any mutation."""
         node = self._nodes.get(polyline_id)
         if node:
-            node.rebuild()
+            node.rebuild(self.level)
 
     def rebuild_all(self) -> None:
         for node in self._nodes.values():
-            node.rebuild()
+            node.rebuild(self.level)
 
     # ── Selection ─────────────────────────────────────────────────────────────
 

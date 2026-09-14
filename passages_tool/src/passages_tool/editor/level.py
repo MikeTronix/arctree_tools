@@ -109,6 +109,38 @@ class TextureInterval:
     x_offset:    float = 0.0
 
 
+def wall_edge_index_pairs(pl: "Polyline") -> list[tuple[int, int]]:
+    """Vertex-index pairs for each wall segment, including the closing edge."""
+    n = len(pl.vertices)
+    if n < 2:
+        return []
+    pairs = [(i, i + 1) for i in range(n - 1)]
+    if pl.closed and n >= 3:
+        pairs.append((n - 1, 0))
+    return pairs
+
+
+def interval_edge_indices(pl: "Polyline", iv: TextureInterval) -> list[int]:
+    """Edge indices covered by a texture interval.
+
+    Matches converter/wall_builder: edges ``from … to-1``, plus the closing
+    edge ``n-1 → 0`` when the wall is closed and the interval reaches the
+    last vertex.
+    """
+    n = len(pl.vertices)
+    if n < 2:
+        return []
+    idxs: list[int] = []
+    for i in range(iv.from_vertex, iv.to_vertex):
+        if 0 <= i < n - 1:
+            idxs.append(i)
+    if pl.closed and iv.to_vertex == n - 1:
+        closing = n - 1
+        if closing not in idxs:
+            idxs.append(closing)
+    return idxs
+
+
 @dataclass
 class Tile:
     x:       int
@@ -166,6 +198,8 @@ class Polyline:
               texture, transparency, z_offset, v_at_floor,
               is_light_source, light_color, light_intensity
     EYEPATH:  vertices, edges
+    ANCHOR:   vertices[0] = position (x,z); radius, height, z_offset,
+              max_distance, fov_limit, sprite_count, tags
     """
     id:   str
     type: PolylineType = PolylineType.WALL
@@ -194,8 +228,14 @@ class Polyline:
     light_intensity: float = 1.0
     warning:        bool = False
 
+    # ── ADAPTIVE ARCH (v3) ───────────────────────────────────────────────────
+    auto_snap:      bool = False
+    target_walls:   list[str] = field(default_factory=list)
+
     # ── ANCHOR ───────────────────────────────────────────────────────────────
-    radius:         float = 0.5
+    radius:         float = 0.5     # nominal footprint half-width (m)
+    height:         float = 2.0     # nominal extent height (m); vertical size of
+                                    #   the visibility sample grid (artist-estimated)
     max_distance:   float = 10.0
     fov_limit:      Optional[float] = None
     sprite_count:   int = 1
@@ -272,6 +312,8 @@ class Polyline:
             d["light_color"]    = list(self.light_color)
             d["light_intensity"]= self.light_intensity
             d["warning"]        = self.warning
+            d["auto_snap"]      = self.auto_snap
+            d["target_walls"]   = list(self.target_walls)
         elif self.type == PolylineType.EYEPATH:
             d["vertices"] = [list(v) for v in self.vertices]
             d["edges"]    = [list(e) for e in self.edges]
@@ -280,6 +322,7 @@ class Polyline:
             d["position"]       = list(pos)
             d["z_offset"]       = self.z_offset
             d["radius"]         = self.radius
+            d["height"]         = self.height
             d["max_distance"]   = self.max_distance
             d["fov_limit"]      = self.fov_limit
             d["sprite_count"]   = self.sprite_count
@@ -323,6 +366,8 @@ class Polyline:
                 light_color    = (float(lc[0]), float(lc[1]), float(lc[2])),
                 light_intensity= float(pd.get("light_intensity", 1.0)),
                 warning        = bool(pd.get("warning", False)),
+                auto_snap      = bool(pd.get("auto_snap", False)),
+                target_walls   = list(pd.get("target_walls", [])),
             )
 
         elif pl_type == PolylineType.EYEPATH:
@@ -341,6 +386,7 @@ class Polyline:
                 vertices       = [pos],
                 z_offset       = float(pd.get("z_offset", 0.0)),
                 radius         = float(pd.get("radius", 0.5)),
+                height         = float(pd.get("height", 2.0)),
                 max_distance   = float(pd.get("max_distance", 10.0)),
                 fov_limit      = pd.get("fov_limit"),
                 sprite_count   = int(pd.get("sprite_count", 1)),
@@ -446,6 +492,38 @@ class Level:
             pl.edges = new_edges
 
             self.dirty = True
+
+    def insert_vertex(self, polyline_id: str, after_idx: int,
+                      x: float, z: float) -> None:
+        """Insert a vertex immediately after `after_idx`, reindexing texture
+        intervals and eyepath edges. This is the inverse of delete_vertex():
+        any vertex index strictly greater than `after_idx` shifts up by one.
+
+        For a texture interval that covered the split edge (its to_vertex was
+        after_idx+1), the +1 shift extends it to after_idx+2 so it keeps
+        covering both new sub-edges — no texture gap is introduced.
+        """
+        pl = self.polylines.get(polyline_id)
+        if pl is None or not (0 <= after_idx < len(pl.vertices)):
+            return
+
+        pl.vertices.insert(after_idx + 1, (x, z))
+
+        # Shift texture-interval endpoints past the split point.
+        for iv in pl.texture_intervals:
+            if iv.from_vertex > after_idx:
+                iv.from_vertex += 1
+            if iv.to_vertex > after_idx:
+                iv.to_vertex += 1
+
+        # Shift eyepath edge endpoints past the split point.
+        pl.edges = [
+            (vi + 1 if vi > after_idx else vi,
+             vj + 1 if vj > after_idx else vj)
+            for (vi, vj) in pl.edges
+        ]
+
+        self.dirty = True
 
     def set_polyline_closed(self, polyline_id: str, closed: bool) -> None:
         pl = self.polylines.get(polyline_id)
@@ -554,7 +632,14 @@ class Level:
 
     # ── Serialisation ─────────────────────────────────────────────────────────
 
+    def sync_derived_fov_h(self) -> None:
+        """Set meta.fov_h from fov_v and render aspect. Does not touch dirty."""
+        self.meta.fov_h = config.derived_fov_h(
+            self.meta.fov_v, self.meta.render_width, self.meta.render_height
+        )
+
     def to_dict(self) -> dict:
+        self.sync_derived_fov_h()
         m = self.meta
         return {
             "version": 2,
@@ -608,6 +693,8 @@ class Level:
         m.render_height      = int(meta.get("render_height", config.DEFAULT_RENDER_HEIGHT))
         m.floor_texture      = meta.get("floor_texture")
         m.ceiling_texture    = meta.get("ceiling_texture")
+        # fov_h is derived from fov_v + render aspect; ignore any stored value.
+        level.sync_derived_fov_h()
 
         grid = data.get("grid", {})
         level.grid.cell_size = float(grid.get("cell_size", 1.0))

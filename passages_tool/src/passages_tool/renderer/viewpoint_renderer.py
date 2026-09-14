@@ -11,6 +11,7 @@ from typing import Any, Optional
 from direct.showbase.ShowBase import ShowBase
 from panda3d.core import Filename, PNMImage, PerspectiveLens, PointLight, LColor
 
+from passages_tool.config import derived_fov_h
 from passages_tool.converter.scene_builder import load_scene
 from passages_tool.editor.level import Level, PolylineType
 
@@ -33,9 +34,10 @@ class ViewpointRenderer:
         from passages_tool.textures.manager import preload_level_textures
         preload_level_textures(self.level, self.texture_dir)
 
-        # Load the assembled scene graph
+        # Load the assembled scene graph as its own tree — do not parent it to
+        # the editor's `render`, or 3D walls flash into the 2D viewport. The
+        # offscreen camera is reparented onto scene_root, so it still sees it.
         self.scene_root = load_scene(self.level, self.scene_dir, self.base.loader)
-        self.scene_root.reparent_to(self.base.render)
 
     def render_edge(
         self,
@@ -59,7 +61,6 @@ class ViewpointRenderer:
         p_from = eyepath_pl.vertices[v_from]
         p_to = eyepath_pl.vertices[v_to]
         eye_height = self.level.meta.eye_height
-        fov_h = self.level.meta.fov_h
         fov_v = self.level.meta.fov_v
 
         render_w = width if width is not None else self.level.meta.render_width
@@ -78,9 +79,12 @@ class ViewpointRenderer:
         cam.set_pos(p_from[0], p_from[1], eye_height)
         cam.look_at(p_to[0], p_to[1], eye_height)
 
-        # Configure perspective lens
+        # Configure perspective lens (HFOV from VFOV × buffer aspect)
         lens = PerspectiveLens()
-        lens.set_fov(fov_h, fov_v)
+        aspect_ratio = render_w / max(1, render_h)
+        fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
+        lens.set_aspect_ratio(aspect_ratio)
+        lens.set_fov(fov_h_calc, fov_v)
         lens.set_near_far(0.1, 100.0)
         cam.node().set_lens(lens)
 
@@ -132,7 +136,6 @@ class ViewpointRenderer:
         p_from = eyepath_pl.vertices[v_from]
         p_to = eyepath_pl.vertices[v_to]
         eye_height = self.level.meta.eye_height
-        fov_h = self.level.meta.fov_h
         fov_v = self.level.meta.fov_v
 
         render_w = width if width is not None else self.level.meta.render_width
@@ -155,9 +158,12 @@ class ViewpointRenderer:
         cam.set_pos(p_mid_x, p_mid_y, eye_height)
         cam.look_at(p_to[0], p_to[1], eye_height)
 
-        # Configure perspective lens
+        # Configure perspective lens (HFOV from VFOV × buffer aspect)
         lens = PerspectiveLens()
-        lens.set_fov(fov_h, fov_v)
+        aspect_ratio = render_w / max(1, render_h)
+        fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
+        lens.set_aspect_ratio(aspect_ratio)
+        lens.set_fov(fov_h_calc, fov_v)
         lens.set_near_far(0.1, 100.0)
         cam.node().set_lens(lens)
 

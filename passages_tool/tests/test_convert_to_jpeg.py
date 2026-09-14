@@ -96,6 +96,45 @@ def test_manifest_rewriting_fallback(tmp_path):
     assert rewritten["v0000_to_v0001"]["midpoint_image_path"] == "mid_v0000_to_v0001.png"
 
 
+def test_manifest_rewriting_v2_nested_edges(tmp_path):
+    """Production bake manifests nest edges under `edges`; those paths must rewrite."""
+    input_dir = tmp_path / "renders"
+    output_dir = tmp_path / "shipping"
+    input_dir.mkdir()
+
+    Image.new("RGBA", (10, 10), (255, 0, 0, 255)).save(
+        input_dir / "render_v0000_to_v0001.png", "PNG"
+    )
+    Image.new("RGBA", (10, 10), (0, 0, 0, 0)).save(
+        input_dir / "mid_v0000_to_v0001.png", "PNG"
+    )
+
+    manifest_data = {
+        "version": 2,
+        "edges": {
+            "v0000_to_v0001": {
+                "image_path": "render_v0000_to_v0001.png",
+                "midpoint_image_path": "mid_v0000_to_v0001.png",
+            }
+        },
+        "eyepoints": {"v0000": {"xyz": [0, 0, 1.7], "visible_anchors": {}}},
+    }
+    with open(input_dir / "manifest.json", "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f)
+
+    with patch("passages_tool.renderer.convert_to_jpeg.find_basisu", return_value=None):
+        convert_renders(input_dir, output_dir)
+
+    with open(output_dir / "manifest.json", "r", encoding="utf-8") as f:
+        rewritten = json.load(f)
+
+    assert rewritten["version"] == 2
+    assert rewritten["eyepoints"]["v0000"]["xyz"] == [0, 0, 1.7]
+    edge = rewritten["edges"]["v0000_to_v0001"]
+    assert edge["image_path"] == "render_v0000_to_v0001.jpg"
+    assert edge["midpoint_image_path"] == "mid_v0000_to_v0001.png"
+
+
 def test_convert_with_basisu_active(tmp_path):
     input_dir = tmp_path / "renders"
     output_dir = tmp_path / "shipping"

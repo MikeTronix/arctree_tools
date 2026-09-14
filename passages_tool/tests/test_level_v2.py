@@ -17,6 +17,7 @@ import json
 import pytest
 from pathlib import Path
 
+from passages_tool.config import derived_fov_h
 from passages_tool.editor.level import (
     Level, Polyline, PolylineType, TextureInterval, LevelMeta,
 )
@@ -75,14 +76,14 @@ class TestLevelMeta:
         m = LevelMeta()
         assert m.wall_height        == 4.0
         assert m.eye_height         == 1.7
-        assert m.fov_h              == 90.0
+        assert m.fov_h              == 91.5
         assert m.fov_v              == 60.0
         assert m.pixels_per_meter   == 256.0
         assert m.fog_start          == 20.0
         assert m.fog_end            == 40.0
         assert m.snap_grid          == 0.25
         assert m.render_width       == 1024
-        assert m.render_height      == 768
+        assert m.render_height      == 576
         assert m.floor_texture      is None
         assert m.ceiling_texture    is None
 
@@ -114,7 +115,28 @@ class TestLevelMeta:
         assert level.meta.snap_grid   == 0.25
         assert level.meta.pixels_per_meter == 256.0
         assert level.meta.render_width == 1024
-        assert level.meta.render_height == 768
+        assert level.meta.render_height == 576
+        assert level.meta.fov_h == pytest.approx(
+            derived_fov_h(60.0, 1024, 576), abs=0.05
+        )
+
+    def test_fov_h_is_derived_from_fov_v_and_aspect(self):
+        """Stored fov_h is ignored; load recomputes from fov_v × render size."""
+        data = {
+            "version": 2,
+            "meta": {
+                "fov_h": 90.0,
+                "fov_v": 60.0,
+                "render_width": 1024,
+                "render_height": 768,
+            },
+            "polylines": [],
+        }
+        level = Level.from_dict(data)
+        expected = derived_fov_h(60.0, 1024, 768)
+        assert expected == pytest.approx(75.2, abs=0.2)
+        assert level.meta.fov_h == pytest.approx(expected, abs=0.05)
+        assert level.to_dict()["meta"]["fov_h"] == pytest.approx(expected, abs=0.05)
 
 
     def test_legacy_texture_pixel_size_migration(self):

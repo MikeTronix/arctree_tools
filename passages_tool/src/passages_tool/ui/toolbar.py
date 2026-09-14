@@ -32,7 +32,7 @@ _MODE_COLORS = {
     ToolMode.DRAW_WALL:    (1.00, 0.92, 0.35, 1.0),   # warm yellow
     ToolMode.DRAW_ARCH:    (0.35, 0.95, 1.00, 1.0),   # cyan
     ToolMode.DRAW_EYEPATH: (0.40, 1.00, 0.60, 1.0),   # spring green
-    ToolMode.DRAW_ANCHOR:  (1.00, 0.40, 0.95, 1.0),   # magenta
+    ToolMode.DRAW_ANCHOR:  (0.72, 0.64, 1.00, 1.0),   # blue-violet
 }
 
 

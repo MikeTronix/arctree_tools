@@ -174,7 +174,7 @@ class PropertiesPanel:
         if t == PolylineType.WALL:
             self._draw_wall_props(imgui, polyline, palette_sel)
         elif t == PolylineType.ARCH:
-            self._draw_arch_props(imgui, polyline, palette_sel)
+            self._draw_arch_props(imgui, polyline, palette_sel, level)
         elif t == PolylineType.EYEPATH:
             self._draw_eyepath_props(imgui, polyline)
         elif t == PolylineType.ANCHOR:
@@ -340,6 +340,7 @@ class PropertiesPanel:
 
     def _draw_arch_props(
         self, imgui, polyline: Polyline, palette_sel: Optional[str],
+        level: Optional[Level] = None,
     ) -> None:
         # ── Position ──────────────────────────────────────────────────────────
         imgui.text_colored((0.25, 0.82, 0.91, 1.0), "Position")
@@ -372,9 +373,10 @@ class PropertiesPanel:
         if not is_billboard:
             curr_ang = float(polyline.orientation) if isinstance(
                 polyline.orientation, (int, float)) else 0.0
+            imgui.text("Angle")
             imgui.set_next_item_width(-1)
             ang_changed, new_ang = imgui.slider_float(
-                "Angle##ori", curr_ang, 0.0, 360.0, "%.1f deg")
+                "##ori", curr_ang, 0.0, 360.0, "%.1f deg")
             if ang_changed:
                 fn = self._cb.get("set_field")
                 if fn:
@@ -385,13 +387,45 @@ class PropertiesPanel:
         # ── Geometry ──────────────────────────────────────────────────────────
         imgui.text_colored((0.25, 0.82, 0.91, 1.0), "Geometry")
 
-        imgui.set_next_item_width(-1)
-        w_changed, new_w = imgui.input_float(
-            "Width##arch", polyline.width, step=0.1, format="%.2f")
-        if w_changed:
-            fn = self._cb.get("set_field")
-            if fn:
-                fn(polyline.id, "width", max(0.01, new_w))
+        is_billboard = (polyline.orientation == "billboard")
+        auto_snap_val = False
+
+        if not is_billboard:
+            auto_snap_val = getattr(polyline, "auto_snap", False)
+            as_changed, new_as = imgui.checkbox("Auto-snap to walls", auto_snap_val)
+            if as_changed:
+                fn = self._cb.get("set_field")
+                if fn:
+                    fn(polyline.id, "auto_snap", new_as)
+            
+            if auto_snap_val:
+                if level is not None:
+                    try:
+                        from passages_tool.converter.arch_builder import find_snap_points
+                        try:
+                            theta_deg = float(polyline.orientation)
+                        except (ValueError, TypeError):
+                            theta_deg = 0.0
+                        _, _, snap_w, _, _ = find_snap_points(
+                            level, polyline.position, theta_deg
+                        )
+                        if abs(snap_w - polyline.width) > 1e-4:
+                            fn = self._cb.get("set_field")
+                            if fn:
+                                fn(polyline.id, "width", snap_w)
+                    except (ValueError, TypeError, ArithmeticError):
+                        pass
+                imgui.text(f"Width (snapped): {polyline.width:.2f} m")
+
+        if is_billboard or not auto_snap_val:
+            imgui.text("Width (m)")
+            imgui.set_next_item_width(-1)
+            w_changed, new_w = imgui.input_float(
+                "##arch_w", polyline.width, step=0.1, format="%.2f")
+            if w_changed:
+                fn = self._cb.get("set_field")
+                if fn:
+                    fn(polyline.id, "width", max(0.01, new_w))
 
         use_override = polyline.height_override is not None
         ho_changed, new_use_ho = imgui.checkbox("Override height", use_override)
@@ -401,18 +435,20 @@ class PropertiesPanel:
                 fn(polyline.id, "height_override", 4.0 if new_use_ho else None)
 
         if use_override:
+            imgui.text("Height (m)")
             imgui.set_next_item_width(-1)
             hov = polyline.height_override or 4.0
             hc, nh = imgui.input_float(
-                "Height##arch_h", hov, step=0.1, format="%.2f")
+                "##arch_h", hov, step=0.1, format="%.2f")
             if hc:
                 fn = self._cb.get("set_field")
                 if fn:
                     fn(polyline.id, "height_override", max(0.01, nh))
 
+        imgui.text("Z offset (m)")
         imgui.set_next_item_width(-1)
         zc, nz = imgui.input_float(
-            "Z offset##arch", polyline.z_offset, step=0.05, format="%.2f")
+            "##arch_z", polyline.z_offset, step=0.05, format="%.2f")
         if zc:
             fn = self._cb.get("set_field")
             if fn:
@@ -449,8 +485,9 @@ class PropertiesPanel:
         except ValueError:
             trans_idx = 1
 
+        imgui.text("Transparency")
         imgui.set_next_item_width(-1)
-        tc, ni = imgui.combo("Transparency##arch", trans_idx, _TRANS_LABELS)
+        tc, ni = imgui.combo("##arch_trans", trans_idx, _TRANS_LABELS)
         if tc:
             fn = self._cb.get("set_field")
             if fn:
@@ -467,16 +504,18 @@ class PropertiesPanel:
 
         if polyline.is_light_source:
             imgui.text_colored((1.0, 0.85, 0.4, 1.0), "Light")
+            imgui.text("Color")
             imgui.set_next_item_width(-1)
-            cc, nc = imgui.color_edit3("Color##lc", polyline.light_color)
+            cc, nc = imgui.color_edit3("##lc", polyline.light_color)
             if cc:
                 fn = self._cb.get("set_field")
                 if fn:
                     fn(polyline.id, "light_color", tuple(nc))
 
+            imgui.text("Intensity")
             imgui.set_next_item_width(-1)
             ic, ni2 = imgui.slider_float(
-                "Intensity##li", polyline.light_intensity,
+                "##li", polyline.light_intensity,
                 0.0, 10.0, "%.2f")
             if ic:
                 fn = self._cb.get("set_field")
@@ -570,15 +609,15 @@ class PropertiesPanel:
             if self._preview_image_ref is not None:
                 imgui.separator()
                 imgui.text("Preview:")
-                # Display 3D preview image (aspect ratio 4:3, fit in properties panel width)
-                # PROPS_PANEL_W is 320, minus padding is 304 width, 228 height
-                imgui.image(self._preview_image_ref, (304, 228))
+                # Display 3D preview image (aspect ratio 16:9, fit in properties panel width)
+                # PROPS_PANEL_W is 320, minus padding is 304 width, 171 height
+                imgui.image(self._preview_image_ref, (304, 171))
 
     # ── ANCHOR ────────────────────────────────────────────────────────────────
 
     def _draw_anchor_props(self, imgui, polyline: Polyline) -> None:
         # ── Position ──────────────────────────────────────────────────────────
-        imgui.text_colored((0.91, 0.25, 0.78, 1.0), "Position")
+        imgui.text_colored((0.72, 0.64, 1.00, 1.0), "Position")
         if polyline.vertices:
             px, pz = polyline.vertices[0]
             imgui.set_next_item_width(100)
@@ -596,30 +635,43 @@ class PropertiesPanel:
         imgui.separator()
 
         # ── Anchor Settings ───────────────────────────────────────────────────
-        imgui.text_colored((0.91, 0.25, 0.78, 1.0), "Settings")
+        imgui.text_colored((0.72, 0.64, 1.00, 1.0), "Settings")
 
         # Radius
+        imgui.text("Radius (footprint, m)")
         imgui.set_next_item_width(-1)
         r_changed, new_r = imgui.input_float(
-            "Radius##anchor", polyline.radius, step=0.1, format="%.2f")
+            "##anchor_radius", polyline.radius, step=0.1, format="%.2f")
         if r_changed:
             fn = self._cb.get("set_field")
             if fn:
                 fn(polyline.id, "radius", max(0.01, new_r))
 
+        # height (nominal extent — vertical size of the visibility sample grid)
+        imgui.text("Height (extent, m)")
+        imgui.set_next_item_width(-1)
+        h_changed, new_h = imgui.input_float(
+            "##anchor_height", polyline.height, step=0.1, format="%.2f")
+        if h_changed:
+            fn = self._cb.get("set_field")
+            if fn:
+                fn(polyline.id, "height", max(0.01, new_h))
+
         # height offset (z_offset)
+        imgui.text("Height Offset (lift base, m)")
         imgui.set_next_item_width(-1)
         z_changed, new_z = imgui.input_float(
-            "Height Offset##anchor", polyline.z_offset, step=0.1, format="%.2f")
+            "##anchor_zoff", polyline.z_offset, step=0.1, format="%.2f")
         if z_changed:
             fn = self._cb.get("set_field")
             if fn:
                 fn(polyline.id, "z_offset", new_z)
 
         # max_distance
+        imgui.text("Max Distance (render cutoff, m)")
         imgui.set_next_item_width(-1)
         md_changed, new_md = imgui.input_float(
-            "Max Distance##anchor", polyline.max_distance, step=0.5, format="%.1f")
+            "##anchor_maxdist", polyline.max_distance, step=0.5, format="%.1f")
         if md_changed:
             fn = self._cb.get("set_field")
             if fn:
@@ -635,27 +687,30 @@ class PropertiesPanel:
 
         if use_fov_limit:
             curr_fl = float(polyline.fov_limit) if polyline.fov_limit is not None else 45.0
+            imgui.text("Max Angle Offset")
             imgui.set_next_item_width(-1)
             fl_changed, new_fl = imgui.slider_float(
-                "Max Angle Offset##anchor", curr_fl, 1.0, 180.0, "%.1f deg")
+                "##anchor_fov", curr_fl, 1.0, 180.0, "%.1f deg")
             if fl_changed:
                 fn = self._cb.get("set_field")
                 if fn:
                     fn(polyline.id, "fov_limit", new_fl)
 
         # sprite_count
+        imgui.text("Sprite Capacity")
         imgui.set_next_item_width(-1)
-        sc_changed, new_sc = imgui.input_int("Sprite Capacity##anchor", polyline.sprite_count)
+        sc_changed, new_sc = imgui.input_int("##anchor_sprcount", polyline.sprite_count)
         if sc_changed:
             fn = self._cb.get("set_field")
             if fn:
                 fn(polyline.id, "sprite_count", max(1, new_sc))
 
         # tags
+        imgui.text("Tags (comma separated)")
         imgui.set_next_item_width(-1)
         tags_str = ", ".join(polyline.tags)
         tags_changed, new_tags_str = imgui.input_text(
-            "Tags (comma separated)##anchor", tags_str)
+            "##anchor_tags", tags_str)
         if tags_changed:
             fn = self._cb.get("set_field")
             if fn:
@@ -666,6 +721,7 @@ class PropertiesPanel:
 
     def _draw_vertex_list(self, imgui, polyline: Polyline) -> None:
         to_delete: Optional[int] = None
+        to_insert: Optional[tuple[int, float, float]] = None
 
         for i, (vx, vz) in enumerate(polyline.vertices):
             imgui.push_id(i)
@@ -700,12 +756,28 @@ class PropertiesPanel:
             if imgui.button("X"):
                 to_delete = i
 
+            # Insert a vertex on the edge leaving this one (midpoint), then the
+            # artist drags it into place. Wraps for closed polygons; skipped on
+            # the last vertex of an open polyline (no edge to split).
+            n = len(polyline.vertices)
+            nxt = (i + 1) % n if polyline.closed else i + 1
+            if nxt < n:
+                imgui.same_line()
+                if imgui.button("Ins"):
+                    nvx, nvz = polyline.vertices[nxt]
+                    to_insert = (i, (vx + nvx) / 2.0, (vz + nvz) / 2.0)
+
             imgui.pop_id()
 
         if to_delete is not None:
             fn = self._cb.get("del_vertex")
             if fn:
                 fn(polyline.id, to_delete)
+
+        if to_insert is not None:
+            fn = self._cb.get("insert_vertex")
+            if fn:
+                fn(polyline.id, to_insert[0], to_insert[1], to_insert[2])
 
     def _draw_level_meta(self, imgui, level: Level, palette_sel: Optional[str]) -> None:
         imgui.text_colored((0.28, 0.91, 0.50, 1.0), "Level Properties")
@@ -744,17 +816,18 @@ class PropertiesPanel:
         if changed and fn:
             fn("eye_height", max(0.1, e_val))
 
-        # fov_h / fov_v
-        imgui.text("FOV Horiz / Vert:")
-        imgui.set_next_item_width(80)
-        changed_h, fh_val = imgui.input_float("##meta_fovh", m.fov_h, format="%.1f")
+        # fov_v is authored; fov_h is derived from VFOV × render aspect.
+        imgui.text("FOV Vertical:")
         imgui.same_line()
         imgui.set_next_item_width(80)
         changed_v, fv_val = imgui.input_float("##meta_fovv", m.fov_v, format="%.1f")
-        if changed_h and fn:
-            fn("fov_h", max(1.0, min(179.0, fh_val)))
         if changed_v and fn:
             fn("fov_v", max(1.0, min(179.0, fv_val)))
+        from passages_tool.config import derived_fov_h
+        derived_h = derived_fov_h(m.fov_v, m.render_width, m.render_height)
+        imgui.text_disabled(
+            f"FOV Horiz (from V + {m.render_width}×{m.render_height}): {derived_h:.1f}°"
+        )
 
         # pixels_per_meter
         imgui.text("Pixels/Meter:")

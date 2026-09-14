@@ -2,36 +2,77 @@
 renderer/manifest.py
 ────────────────────
 Builds, saves, and inspects the render manifest JSON for a level.
+
+Manifest shape (version 2 — see design_docs/passages_anchor_visibility_bake_06JUL26.md):
+
+    {
+      "version": 2,
+      "edges": {                       # one entry per directed EyePath edge
+        "v0000_to_v0001": {
+          "image_path", "midpoint_image_path", "eyepoint_xyz", "facing_xyz",
+          "rendered", "flicker", "exit"
+        }, ...
+      },
+      "eyepoints": {                   # one entry per EyePath vertex
+        "v0000": {
+          "xyz": [x, y, eye_height],
+          "visible_anchors": {         # occlusion candidates (view-independent)
+            "<anchor_id>": {
+              "world_xyz": [ax, ay, z_offset],
+              "radius", "height", "max_distance",
+              "occ_coverage",          # baked fraction of extent unoccluded
+              "distance"               # eye→anchor planar distance
+            }, ...
+          }
+        }, ...
+      }
+    }
+
+Occlusion is baked here (view-independent, per eyepoint) via CPU ray-vs-geometry
+with arch texture-alpha sampling (renderer/occluder.py) + extent coverage
+sampling (renderer/occlusion.py). The FOV/frustum cull and screen projection are
+deferred to the runtime, which combines occ_coverage with its own frustum
+coverage against the live look-at.
 """
 from __future__ import annotations
 
 import json
-import math
 import re
 from pathlib import Path
 from typing import Any, Optional
 
 from passages_tool.editor.level import Level, PolylineType
+from passages_tool.renderer.occluder import build_occluders
+from passages_tool.renderer.occlusion import sample_grid_points, occlusion_coverage
+
+MANIFEST_VERSION = 2
+
+# Extent sample-grid + coverage parameters (§4.1).
+_GRID_WIDE = 3
+_GRID_TALL = 4
+_SAMPLE_BIAS = 0.05
+_COVERAGE_FLOOR = 0.1     # drop anchors below this baked coverage (runtime T is higher)
 
 
-def ccw(A: tuple[float, float], B: tuple[float, float], C: tuple[float, float]) -> bool:
-    return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+def build_manifest(
+    level: Level,
+    output_dir: Optional[Path] = None,
+    texture_dir: Optional[Path] = None,
+) -> dict[str, Any]:
+    """Build the render manifest (version 2) for the level.
 
-
-def segments_intersect(A: tuple[float, float], B: tuple[float, float], C: tuple[float, float], D: tuple[float, float]) -> bool:
-    return (ccw(A, C, D) != ccw(B, C, D)) and (ccw(A, B, C) != ccw(A, B, D))
-
-
-def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str, Any]:
+    `edges` lists both directions of each EyePath edge with camera/target
+    coordinates (and whether the image exists in `output_dir`). `eyepoints`
+    lists, per vertex, the anchors that are unoccluded enough to be candidates
+    for display, with their baked occlusion coverage.
     """
-    Build the render manifest dictionary for the level.
-    Lists all directed edges in the EyePath with camera positions and target coordinates.
-    Checks if the corresponding image exists in output_dir.
-    """
-    manifest: dict[str, Any] = {}
+    manifest: dict[str, Any] = {
+        "version": MANIFEST_VERSION,
+        "edges": {},
+        "eyepoints": {},
+    }
     eye_height = level.meta.eye_height
 
-    # Find the EyePath polyline
     eyepath_pl = None
     for pl in level.polylines.values():
         if pl.type == PolylineType.EYEPATH:
@@ -41,137 +82,33 @@ def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str,
     if not eyepath_pl or not eyepath_pl.vertices:
         return manifest
 
-    # For each directed edge, create an entry
-    for v_from, v_to in eyepath_pl.edges:
+    # ── edges (bidirectional, deduped) ────────────────────────────────────────
+    directed_edges: list[tuple[int, int]] = []
+    _seen_dir: set[tuple[int, int]] = set()
+    for a, b in eyepath_pl.edges:
+        for e in ((a, b), (b, a)):
+            if e not in _seen_dir:
+                _seen_dir.add(e)
+                directed_edges.append(e)
+
+    for v_from, v_to in directed_edges:
         if v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
             continue
-
         p_from = eyepath_pl.vertices[v_from]
         p_to = eyepath_pl.vertices[v_to]
-
-        # Edge key format: v0000_to_v0001
         key = f"v{v_from:04d}_to_v{v_to:04d}"
-        
-        # Determine if image exists
+
         image_name = f"render_{key}.png"
         rendered = False
         midpoint_image_path = None
         if output_dir is not None:
             rendered = (Path(output_dir) / image_name).is_file()
-            mid_image_name = f"mid_{key}.png"
+            lo, hi = (v_from, v_to) if v_from <= v_to else (v_to, v_from)
+            mid_image_name = f"mid_v{lo:04d}_to_v{hi:04d}.png"
             if (Path(output_dir) / mid_image_name).is_file():
                 midpoint_image_path = mid_image_name
 
-        # Calculate visible anchors
-        visible_anchors = {}
-        for anchor in level.polylines.values():
-            if anchor.type != PolylineType.ANCHOR:
-                continue
-            if not anchor.vertices:
-                continue
-
-            ax, ay = anchor.vertices[0]
-            dx_rel = ax - p_from[0]
-            dy_rel = ay - p_from[1]
-            dist = math.hypot(dx_rel, dy_rel)
-
-            max_dist = min(anchor.max_distance, level.meta.fog_end)
-            if dist > max_dist or dist < 0.1:
-                continue
-
-            # View direction vector
-            vx = p_to[0] - p_from[0]
-            vy = p_to[1] - p_from[1]
-            v_len = math.hypot(vx, vy)
-            if v_len == 0.0:
-                continue
-            vx /= v_len
-            vy /= v_len
-
-            # Relative direction to anchor
-            ux = dx_rel / dist
-            uy = dy_rel / dist
-
-            # Angle check
-            cos_theta = vx * ux + vy * uy
-            cos_theta = min(1.0, max(-1.0, cos_theta))
-            theta_rad = math.acos(cos_theta)
-
-            fov_limit = anchor.fov_limit if anchor.fov_limit is not None else (level.meta.fov_h * 0.5)
-            if math.degrees(theta_rad) > fov_limit:
-                continue
-
-            # Line-of-sight check (segment intersection)
-            p_start = (p_from[0] + 0.01 * dx_rel, p_from[1] + 0.01 * dy_rel)
-            p_end = (ax - 0.01 * dx_rel, ay - 0.01 * dy_rel)
-
-            blocked = False
-            for pl in level.polylines.values():
-                if pl.type == PolylineType.WALL:
-                    for i in range(len(pl.vertices) - 1):
-                        w1 = pl.vertices[i]
-                        w2 = pl.vertices[i+1]
-                        if segments_intersect(p_start, p_end, w1, w2):
-                            blocked = True
-                            break
-                    if blocked:
-                        break
-                    if pl.closed and len(pl.vertices) >= 3:
-                        w1 = pl.vertices[-1]
-                        w2 = pl.vertices[0]
-                        if segments_intersect(p_start, p_end, w1, w2):
-                            blocked = True
-                            break
-                elif pl.type == PolylineType.ARCH and pl.transparency == "none":
-                    if pl.vertices:
-                        arch_pos = pl.vertices[0]
-                        try:
-                            if pl.orientation != "billboard":
-                                half_w = pl.width * 0.5
-                                ang = math.radians(float(pl.orientation) + 90.0)
-                                adx = math.cos(ang) * half_w
-                                adz = math.sin(ang) * half_w
-                                a1 = (arch_pos[0] - adx, arch_pos[1] - adz)
-                                a2 = (arch_pos[0] + adx, arch_pos[1] + adz)
-                                if segments_intersect(p_start, p_end, a1, a2):
-                                    blocked = True
-                                    break
-                        except ValueError:
-                            pass
-
-            if blocked:
-                continue
-
-            # Projection math
-            fx, fy = vx, vy
-            rx, ry = fy, -fx
-
-            cam_z = level.meta.eye_height
-            anchor_z = anchor.z_offset
-            dz_rel = anchor_z - cam_z
-
-            depth = dx_rel * fx + dy_rel * fy
-            x_cam = dx_rel * rx + dy_rel * ry
-            y_cam = dz_rel
-
-            if depth < 0.1:
-                continue
-
-            w_half = math.tan(math.radians(level.meta.fov_h) * 0.5)
-            h_half = math.tan(math.radians(level.meta.fov_v) * 0.5)
-
-            screen_x = x_cam / (depth * w_half)
-            screen_y = y_cam / (depth * h_half)
-            scale = 1.0 / depth
-
-            visible_anchors[anchor.id] = {
-                "screen_x": round(screen_x, 4),
-                "screen_y": round(screen_y, 4),
-                "scale": round(scale, 4),
-                "distance": round(dist, 3)
-            }
-
-        manifest[key] = {
+        manifest["edges"][key] = {
             "image_path": image_name,
             "midpoint_image_path": midpoint_image_path,
             "eyepoint_xyz": [p_from[0], p_from[1], eye_height],
@@ -179,7 +116,48 @@ def build_manifest(level: Level, output_dir: Optional[Path] = None) -> dict[str,
             "rendered": rendered,
             "flicker": None,
             "exit": None,
-            "visible_anchors": visible_anchors,
+        }
+
+    # ── eyepoints: baked occlusion coverage per anchor (view-independent) ──────
+    occluders = build_occluders(level, texture_dir)
+    anchors = [pl for pl in level.polylines.values()
+               if pl.type == PolylineType.ANCHOR and pl.vertices]
+    fog_end = level.meta.fog_end
+
+    for i, vpos in enumerate(eyepath_pl.vertices):
+        vid = f"v{i:04d}"
+        eye = (vpos[0], vpos[1], eye_height)
+        # occlusion_coverage wants nearest_occluder_dist(sample); close over eye.
+        nearest = lambda p, _eye=eye: occluders.nearest_occluder_dist(_eye, p)
+        visible: dict[str, Any] = {}
+
+        for anchor in anchors:
+            ax, ay = anchor.vertices[0]
+            dist = ((ax - vpos[0]) ** 2 + (ay - vpos[1]) ** 2) ** 0.5
+            max_dist = min(anchor.max_distance, fog_end)
+            if dist > max_dist or dist < 0.1:
+                continue
+
+            grid = sample_grid_points(
+                eye, (ax, ay), anchor.z_offset, anchor.radius, anchor.height,
+                n_wide=_GRID_WIDE, n_tall=_GRID_TALL,
+            )
+            cov = occlusion_coverage(eye, grid, nearest, bias=_SAMPLE_BIAS)
+            if cov < _COVERAGE_FLOOR:
+                continue
+
+            visible[anchor.id] = {
+                "world_xyz": [round(ax, 4), round(ay, 4), round(anchor.z_offset, 4)],
+                "radius": round(anchor.radius, 4),
+                "height": round(anchor.height, 4),
+                "max_distance": round(anchor.max_distance, 4),
+                "occ_coverage": round(cov, 3),
+                "distance": round(dist, 3),
+            }
+
+        manifest["eyepoints"][vid] = {
+            "xyz": [vpos[0], vpos[1], eye_height],
+            "visible_anchors": visible,
         }
 
     return manifest
@@ -208,6 +186,7 @@ def find_stale_images(manifest: dict[str, Any], output_dir: Path) -> list[Path]:
     if not p.is_dir():
         return []
 
+    edges = manifest.get("edges", {})
     stale: list[Path] = []
     for file_path in p.iterdir():
         if file_path.is_file():
@@ -216,7 +195,7 @@ def find_stale_images(manifest: dict[str, Any], output_dir: Path) -> list[Path]:
                 v_from = int(match.group(1))
                 v_to = int(match.group(2))
                 key = f"v{v_from:04d}_to_v{v_to:04d}"
-                if key not in manifest:
+                if key not in edges:
                     stale.append(file_path)
     return stale
 
@@ -225,14 +204,11 @@ def find_missing_images(manifest: dict[str, Any], output_dir: Path) -> list[str]
     """Find any edge keys in the manifest that do not have matching image files on disk."""
     p = Path(output_dir)
     missing: list[str] = []
-    
-    for key, info in manifest.items():
-        image_name = info.get("image_path", f"render_{key}.png")
-        # Check for both .png (editor render) and .jpg (shipping render)
+
+    for key in manifest.get("edges", {}):
         png_path = p / f"render_{key}.png"
         jpg_path = p / f"render_{key}.jpg"
-        
         if not png_path.is_file() and not jpg_path.is_file():
             missing.append(key)
-            
+
     return missing

@@ -18,7 +18,7 @@ Usage
         level = Level.from_dict(snapshot)
 
     if history.can_redo():
-        snapshot = history.redo()
+        snapshot = history.redo(level.to_dict())
         level = Level.from_dict(snapshot)
 """
 from __future__ import annotations
@@ -55,17 +55,17 @@ class History:
         self._redos.append(current_snapshot)
         return self._undos.pop()
 
-    def redo(self) -> Optional[dict]:
+    def redo(self, current_snapshot: dict) -> Optional[dict]:
         """
         Return the snapshot to restore (the state after an undone action).
-        Pushes the current snapshot (which was saved by undo) back onto undos.
+        Pushes `current_snapshot` onto the undo stack first so undo after redo
+        returns to this intermediate state instead of skipping it.
         Returns None if there is nothing to redo.
         """
         if not self._redos:
             return None
-        snapshot = self._redos.pop()
-        # The current state was already saved when undo() was called.
-        return snapshot
+        self._undos.append(current_snapshot)
+        return self._redos.pop()
 
     def clear(self) -> None:
         self._undos.clear()

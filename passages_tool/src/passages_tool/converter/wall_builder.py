@@ -13,7 +13,13 @@ from PIL import Image
 from panda3d.egg import EggGroup
 
 from passages_tool.converter.egg_writer import EggContext
-from passages_tool.editor.level import Level, Polyline, PolylineType, TextureInterval
+from passages_tool.editor.level import (
+    Level,
+    Polyline,
+    PolylineType,
+    TextureInterval,
+    interval_edge_indices,
+)
 
 
 def get_texture_size(
@@ -74,15 +80,13 @@ def build_wall_strips(
             tex_w, tex_h = get_texture_size(iv.texture, texture_dir)
             egg_tex = ctx.get_or_create_texture(iv.texture) if iv.texture else None
 
-            # Collect edges for this interval
+            # Collect edges for this interval (includes the closing edge of a closed wall)
             edges: list[tuple[int, int]] = []
-            for i in range(iv.from_vertex, iv.to_vertex):
-                if i < n_verts - 1:
-                    edges.append((i, i + 1))
-
-            # If this is the last interval and the wall is closed, it covers the closing edge
-            if pl.closed and iv.to_vertex == n_verts - 1:
-                edges.append((n_verts - 1, 0))
+            for e in interval_edge_indices(pl, iv):
+                if e == n_verts - 1 and pl.closed and n_verts >= 2:
+                    edges.append((n_verts - 1, 0))
+                elif e < n_verts - 1:
+                    edges.append((e, e + 1))
 
             accumulated_len = 0.0
             for v_from, v_to in edges:

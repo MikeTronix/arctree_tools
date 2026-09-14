@@ -7,8 +7,8 @@ from __future__ import annotations
 
 import pytest
 
-from passages_tool.editor.level import Level, Polyline
-from passages_tool.editor.validator import validate_arch_visibility
+from passages_tool.editor.level import Level, Polyline, TextureInterval
+from passages_tool.editor.validator import validate_arch_visibility, validate_textures
 
 
 def test_validator_billboard_arches():
@@ -71,13 +71,13 @@ def test_validator_edge_on_fixed_arch():
     arch.orientation = 90.0
     level.add_polyline(arch)
 
-    warnings = validate_arch_visibility(level, threshold_deg=60.0)
+    warnings = validate_arch_visibility(level, threshold_deg=30.0)
     assert len(warnings) == 1
     w = warnings[0]
     assert w.arch_id == arch.id
     assert w.v_from == 0
     assert w.v_to == 1
-    assert w.angle_deg == pytest.approx(90.0)
+    assert w.angle_deg == pytest.approx(0.0)
     assert "edge-on" in w.message
 
 
@@ -99,8 +99,43 @@ def test_validator_out_of_range_arch():
     arch.orientation = 90.0
     level.add_polyline(arch)
 
-    warnings = validate_arch_visibility(level, threshold_deg=60.0)
+    warnings = validate_arch_visibility(level, threshold_deg=30.0)
     assert len(warnings) == 0
+
+
+def test_validate_textures_closed_wall_full_interval():
+    """A closed wall with one 0..n-1 interval covers the closing edge too."""
+    level = Level()
+    level.meta.floor_texture = "floor.png"
+    level.meta.ceiling_texture = "ceil.png"
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)]
+    wall.closed = True
+    wall.texture_intervals = [
+        TextureInterval(from_vertex=0, to_vertex=3, texture="stone.png")
+    ]
+    level.add_polyline(wall)
+
+    warnings = validate_textures(level)
+    assert warnings == []
+
+
+def test_validate_textures_closed_wall_missing_closing_not_false_positive():
+    """Open interval that does not reach the last vertex still flags later edges."""
+    level = Level()
+    level.meta.floor_texture = "floor.png"
+    level.meta.ceiling_texture = "ceil.png"
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (4.0, 0.0), (4.0, 4.0), (0.0, 4.0)]
+    wall.closed = True
+    wall.texture_intervals = [
+        TextureInterval(from_vertex=0, to_vertex=2, texture="stone.png")
+    ]
+    level.add_polyline(wall)
+
+    warnings = validate_textures(level)
+    assert len(warnings) == 1
+    assert "untextured" in warnings[0].message
 
 
 def test_webp_mislabeled_as_png(tmp_path):

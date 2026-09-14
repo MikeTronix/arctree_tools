@@ -81,8 +81,8 @@ def main() -> None:
         sys.exit(1)
 
     # 1. Build manifest
-    manifest = build_manifest(level, output_dir)
-    if not manifest:
+    manifest = build_manifest(level, output_dir, tex_dir)
+    if not manifest.get("edges"):
         has_eyepath = False
         has_vertices = False
         has_edges = False
@@ -110,7 +110,7 @@ def main() -> None:
 
     # 2. Check for missing images
     if args.force:
-        to_render = list(manifest.keys())
+        to_render = list(manifest["edges"].keys())
     else:
         to_render = find_missing_images(manifest, output_dir)
 
@@ -155,7 +155,7 @@ def main() -> None:
             )
             if ok:
                 rendered_count += 1
-                manifest[key]["rendered"] = True
+                manifest["edges"][key]["rendered"] = True
             else:
                 print(f"  Failed to render: {key}", file=sys.stderr)
                 skipped_count += 1
@@ -177,7 +177,16 @@ def main() -> None:
         mid_failed = 0
 
         if eyepath_pl and eyepath_pl.edges:
-            for idx, (v_from, v_to) in enumerate(eyepath_pl.edges):
+            # Midpoint frames are undirected (shared by both travel directions):
+            # bake one per edge using a sorted/undirected name.
+            undirected = []
+            _seen_mid = set()
+            for a, b in eyepath_pl.edges:
+                lo, hi = (a, b) if a <= b else (b, a)
+                if (lo, hi) not in _seen_mid:
+                    _seen_mid.add((lo, hi))
+                    undirected.append((lo, hi))
+            for idx, (v_from, v_to) in enumerate(undirected):
                 key = f"v{v_from:04d}_to_v{v_to:04d}"
                 dest_mid_png = output_dir / f"mid_{key}.png"
 
@@ -186,7 +195,7 @@ def main() -> None:
                     mid_skipped += 1
                     continue
 
-                print(f"[{idx+1}/{len(eyepath_pl.edges)}] Rendering midpoint frame {dest_mid_png.name}...")
+                print(f"[{idx+1}/{len(undirected)}] Rendering midpoint frame {dest_mid_png.name}...")
                 ok = renderer.render_midpoint(
                     v_from, v_to, dest_mid_png, width, height
                 )
@@ -200,7 +209,7 @@ def main() -> None:
             print("No EyePath edges found. Skipping midpoint frame baking.")
 
         # 6. Final manifest rebuild to capture viewpoints and midpoints
-        manifest = build_manifest(level, output_dir)
+        manifest = build_manifest(level, output_dir, tex_dir)
         save_manifest(manifest, save_path)
         print("Final manifest saved with all rendered assets.")
     finally:

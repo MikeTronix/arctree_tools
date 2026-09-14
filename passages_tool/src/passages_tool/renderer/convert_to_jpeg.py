@@ -16,6 +16,22 @@ from pathlib import Path
 from PIL import Image
 
 
+def _manifest_edge_entries(manifest_data: dict) -> list[dict]:
+    """Return the per-edge dicts that hold image_path / midpoint_image_path.
+
+    Production manifests are version 2: ``{"version": 2, "edges": {...}, ...}``.
+    Older shipping tests used a flat ``{ "v0000_to_v0001": {image_path, ...} }``.
+    """
+    edges = manifest_data.get("edges")
+    if isinstance(edges, dict):
+        return [v for v in edges.values() if isinstance(v, dict)]
+    return [
+        v
+        for v in manifest_data.values()
+        if isinstance(v, dict) and ("image_path" in v or "midpoint_image_path" in v)
+    ]
+
+
 def find_basisu(custom_path: str | None = None) -> str | None:
     """Finds the basisu binary, looking at custom_path, local bin directory, and system PATH."""
     if custom_path:
@@ -145,16 +161,14 @@ def convert_renders(
             with open(manifest_src, "r", encoding="utf-8") as f:
                 manifest_data = json.load(f)
 
-            # Rewrite image paths in manifest entries
-            for key, entry in list(manifest_data.items()):
-                # Resolve primary viewpoint image extension
+            # Rewrite image paths on edge entries (v2 nested `edges`, or legacy flat).
+            for entry in _manifest_edge_entries(manifest_data):
                 png_name = entry.get("image_path")
                 if png_name and png_name in compiled_formats:
                     ext = compiled_formats[png_name]
                     stem = Path(png_name).stem
                     entry["image_path"] = stem + ext
 
-                # Resolve midpoint transition image extension
                 mid_png_name = entry.get("midpoint_image_path")
                 if mid_png_name:
                     if mid_png_name in compiled_formats:

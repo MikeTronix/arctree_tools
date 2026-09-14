@@ -3,6 +3,8 @@ config.py — App-wide constants and default values.
 """
 from __future__ import annotations
 
+import math
+
 # ── Window ────────────────────────────────────────────────────────────────────
 
 WINDOW_TITLE = "Passages Level Editor"
@@ -40,8 +42,10 @@ VERTEX_HANDLE_COLOR         = (1.0, 1.0, 1.0, 1.0)
 VERTEX_HANDLE_SEL_COLOR     = (1.0, 1.0, 0.3, 1.0)   # bright yellow when selected
 
 # ── Per-type polyline colours ─────────────────────────────────────────────────
-# Wall: warm yellow; Arch: cyan; EyePath: spring green
+# Wall: warm yellow; Arch: cyan; EyePath: spring green; Anchor: blue-violet.
 # Selected variants are slightly brighter / more saturated.
+# NOTE: anchor colour is kept clear of the red family so it never reads as the
+# error-red (1.0, 0.2, 0.2) that the visibility validator paints on edge-on arches.
 
 COLOR_WALL          = (0.91, 0.78, 0.25, 1.0)
 COLOR_WALL_SELECTED = (1.00, 0.95, 0.40, 1.0)
@@ -49,8 +53,8 @@ COLOR_ARCH          = (0.25, 0.82, 0.91, 1.0)
 COLOR_ARCH_SELECTED = (0.45, 0.97, 1.00, 1.0)
 COLOR_EYEPATH       = (0.28, 0.91, 0.50, 1.0)
 COLOR_EYEPATH_SEL   = (0.50, 1.00, 0.68, 1.0)
-COLOR_ANCHOR        = (0.91, 0.25, 0.78, 1.0)
-COLOR_ANCHOR_SELECTED = (1.00, 0.40, 0.95, 1.0)
+COLOR_ANCHOR        = (0.55, 0.45, 1.00, 1.0)   # blue-violet
+COLOR_ANCHOR_SELECTED = (0.72, 0.64, 1.00, 1.0)
 
 # ── Wall interior-side hatch ticks ────────────────────────────────────────────
 
@@ -101,13 +105,25 @@ LEVEL_FILE_EXT: str     = ".passages.json"
 
 DEFAULT_WALL_HEIGHT: float      = 4.0      # world units; also ceiling height
 DEFAULT_EYE_HEIGHT: float       = 1.7      # camera height above floor (world units)
-DEFAULT_FOV_H: float            = 90.0     # horizontal field of view (degrees)
-DEFAULT_FOV_V: float            = 60.0     # vertical field of view (degrees)
+DEFAULT_FOV_H: float            = 91.5     # derived default: 60° VFOV at 1024×576
+DEFAULT_FOV_V: float            = 60.0     # vertical field of view (degrees); HFOV is derived
+
+
+def derived_fov_h(fov_v_deg: float, width: int, height: int) -> float:
+    """Horizontal FOV implied by vertical FOV and render aspect ratio.
+
+    Matches the baker lens: ``2 * atan(aspect * tan(fov_v / 2))``.
+    ``fov_h`` is not independently authored.
+    """
+    aspect = float(width) / float(max(1, height))
+    return 2.0 * math.degrees(
+        math.atan(aspect * math.tan(math.radians(fov_v_deg * 0.5)))
+    )
 DEFAULT_PIXELS_PER_METER: float = 256.0    # texture pixels per world meter
 DEFAULT_FOG_START: float        = 20.0     # distance where fog begins
 DEFAULT_FOG_END: float          = 40.0     # distance where fog becomes fully opaque
 DEFAULT_SNAP_GRID: float        = 0.25     # default snap grid size (world units)
 DEFAULT_RENDER_WIDTH: int       = 1024     # default width for baked images (pixels)
-DEFAULT_RENDER_HEIGHT: int      = 768      # default height for baked images (pixels)
+DEFAULT_RENDER_HEIGHT: int      = 576      # default height for baked images (pixels)
 
 

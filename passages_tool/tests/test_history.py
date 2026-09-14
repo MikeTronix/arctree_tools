@@ -38,9 +38,25 @@ def test_undo_enables_redo():
 def test_redo_returns_snapshot():
     h = History()
     h.push({"v": 1})
-    h.undo({"v": 2})       # v=1 goes to redo; returns v=1
-    restored = h.redo()    # should give us back the state after undo
-    assert restored is not None
+    undone = h.undo({"v": 2})       # v=1 goes to redo; returns v=1
+    restored = h.redo(undone)       # should give us back the state after the action
+    assert restored == {"v": 2}
+
+
+def test_undo_redo_undo_restores_intermediate():
+    """Redo must push current onto undos so the next undo does not skip a state."""
+    h = History()
+    h.push({"v": 0})   # before action A (state 0 → 1)
+    h.push({"v": 1})   # before action B (state 1 → 2)
+    s1 = h.undo({"v": 2})
+    assert s1 == {"v": 1}
+    s2 = h.redo(s1)
+    assert s2 == {"v": 2}
+    s1_again = h.undo(s2)
+    assert s1_again == {"v": 1}
+    assert h.can_undo()
+    s0 = h.undo(s1_again)
+    assert s0 == {"v": 0}
 
 
 def test_new_push_clears_redo():
@@ -58,7 +74,7 @@ def test_undo_on_empty_returns_none():
 
 def test_redo_on_empty_returns_none():
     h = History()
-    assert h.redo() is None
+    assert h.redo({"v": 0}) is None
 
 
 def test_clear():

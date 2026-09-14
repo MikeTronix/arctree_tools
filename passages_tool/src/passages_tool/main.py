@@ -37,7 +37,6 @@ Tool modes
 """
 from __future__ import annotations
 
-import sys
 import tkinter as tk
 from tkinter import filedialog, messagebox
 from pathlib import Path
@@ -91,6 +90,7 @@ class PassagesApp(ShowBase):
         self._arch_snap_pending = False
         self._pending_arch_id: Optional[str] = None
         self._validation_warnings: list = []
+        self._saved_snapshot: dict = self._level.to_dict()
 
         # ── Panda3D scene setup ───────────────────────────────────────────────
         self.setBackgroundColor(0.12, 0.12, 0.15, 1.0)
@@ -99,6 +99,7 @@ class PassagesApp(ShowBase):
         self._cam   = ViewportCamera(self, WINDOW_W, WINDOW_H)
         self._grid  = BackgroundGrid(self.render)
         self._pm    = PolylineManager(self.render)
+        self._pm.level = self._level
         self._tex   = TextureManager()
 
         self._rebuild_grid()
@@ -116,7 +117,7 @@ class PassagesApp(ShowBase):
             "set_tool": self.set_tool,
             "toggle_snap": self._toggle_snap,
             "run_validation": self._run_validation,
-            "exit":     sys.exit,
+            "exit":     self.cmd_exit,
         })
         self._palette = TexturePalette(
             self._tex,
@@ -129,6 +130,7 @@ class PassagesApp(ShowBase):
             "set_field":               self._cb_set_field,
             "move_vertex":             self._cb_move_vertex,
             "del_vertex":              self._cb_del_vertex,
+            "insert_vertex":           self._cb_insert_vertex,
             "del_polyline":            self._cb_del_polyline,
             # Phase 3 ── interval editor ────────────────────────────────
             "set_interval_texture":    self._cb_set_interval_texture,
@@ -145,6 +147,9 @@ class PassagesApp(ShowBase):
 
         # ── Input bindings ────────────────────────────────────────────────────
         self._init_input()
+        if self.win is not None:
+            self.win.setCloseRequestEvent("passages-close")
+        self.accept("passages-close", self.cmd_exit)
 
         # ── Main update task ───────────────────────────────────────────────────
         self.taskMgr.add(self._update, "passages_update")
@@ -321,6 +326,7 @@ class PassagesApp(ShowBase):
             ToolMode.DRAW_WALL,
             ToolMode.DRAW_ARCH,
             ToolMode.DRAW_EYEPATH,
+            ToolMode.DRAW_ANCHOR,
         ):
             self._draw_add_vertex(wx, wz)
         elif self._tool == ToolMode.SELECT:
@@ -466,11 +472,13 @@ class PassagesApp(ShowBase):
         if self._level.dirty and not self._confirm_discard():
             return
         self._level = Level()
+        self._pm.level = self._level
         self._history.clear()
         self._pm.destroy_all()
         self._file_path = None
         self._active_polyline_id = None
         self._validation_warnings = []
+        self._capture_saved()
 
     def cmd_open(self) -> None:
         if self._level.dirty and not self._confirm_discard():
@@ -488,6 +496,7 @@ class PassagesApp(ShowBase):
             messagebox.showerror("Open Error", str(e), parent=self._tk_root)
             return
         self._level = new_level
+        self._pm.level = self._level
         self._history.clear()
         self._pm.destroy_all()
         self._pm.sync_with_level(self._level.polylines)
@@ -496,6 +505,7 @@ class PassagesApp(ShowBase):
         self._cam.zoom_to_fit(*self._level.bounding_box())
         self._rebuild_grid()
         self._validation_warnings = []
+        self._capture_saved()
 
     def cmd_save(self) -> None:
         if self._file_path is None:
@@ -503,6 +513,7 @@ class PassagesApp(ShowBase):
             return
         try:
             save(self._level, self._file_path)
+            self._capture_saved()
         except LevelIOError as e:
             messagebox.showerror("Save Error", str(e), parent=self._tk_root)
 
@@ -534,19 +545,21 @@ class PassagesApp(ShowBase):
             self._apply_snapshot(snapshot)
 
     def cmd_redo(self) -> None:
-        snapshot = self._history.redo()
+        snapshot = self._history.redo(self._level.to_dict())
         if snapshot is not None:
             self._apply_snapshot(snapshot)
 
     def _apply_snapshot(self, snapshot: dict) -> None:
         old_sel = self._pm.selected_id
         self._level = Level.from_dict(snapshot)
+        self._pm.level = self._level
         self._pm.destroy_all()
         self._pm.sync_with_level(self._level.polylines)
         self._pm.rebuild_all()
         if old_sel and old_sel in self._level.polylines:
             self._pm.select(old_sel)
         self._validation_warnings = []
+        self._refresh_dirty()
 
     # ── Tool mode ──────────────────────────────────────────────────────────────
 
@@ -581,6 +594,12 @@ class PassagesApp(ShowBase):
     def _cb_del_vertex(self, pid: str, idx: int) -> None:
         self._history.push(self._level.to_dict())
         self._level.delete_vertex(pid, idx)
+        self._pm.rebuild_one(pid)
+
+    def _cb_insert_vertex(self, pid: str, after_idx: int,
+                          x: float, z: float) -> None:
+        self._history.push(self._level.to_dict())
+        self._level.insert_vertex(pid, after_idx, x, z)
         self._pm.rebuild_one(pid)
 
     def _cb_del_polyline(self, pid: str) -> None:
@@ -661,9 +680,14 @@ class PassagesApp(ShowBase):
         self._pm.rebuild_one(pid)
 
     def _cb_set_meta_field(self, field: str, value) -> None:
+        if field == "fov_h":
+            # Horizontal FOV is derived from fov_v + render aspect; ignore edits.
+            return
         self._history.push(self._level.to_dict())
         setattr(self._level.meta, field, value)
         self._level.dirty = True
+        if field in ("fov_v", "render_width", "render_height"):
+            self._level.sync_derived_fov_h()
         if field == "snap_grid":
             self._rebuild_grid()
 
@@ -671,8 +695,10 @@ class PassagesApp(ShowBase):
         self._snap_enabled = not self._snap_enabled
 
     def _run_validation(self) -> None:
-        from passages_tool.editor.validator import validate_arch_visibility
-        self._validation_warnings = validate_arch_visibility(self._level)
+        from passages_tool.editor.validator import validate_arch_visibility, validate_textures
+        self._validation_warnings = (
+            validate_arch_visibility(self._level) + validate_textures(self._level)
+        )
         self._rebuild_all_highlights()
 
     def _rebuild_all_highlights(self) -> None:
@@ -684,7 +710,8 @@ class PassagesApp(ShowBase):
         from passages_tool.renderer.viewpoint_renderer import ViewpointRenderer
         from panda3d.core import TexturePool
 
-        preview_dir = Path("_local/tools/passages_tool/temp_preview")
+        # Tool root is parents[2] of this file (src/passages_tool/main.py).
+        preview_dir = Path(__file__).resolve().parents[2] / "temp_preview"
         preview_dir.mkdir(parents=True, exist_ok=True)
         tex_dir = self._tex.base_dir
 
@@ -723,6 +750,19 @@ class PassagesApp(ShowBase):
                     print(f"Error loading preview texture into ImGui: {e}")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
+
+    def _capture_saved(self) -> None:
+        """Record the last-saved document so undo can restore a clean dirty flag."""
+        self._saved_snapshot = self._level.to_dict()
+        self._level.dirty = False
+
+    def _refresh_dirty(self) -> None:
+        self._level.dirty = self._level.to_dict() != self._saved_snapshot
+
+    def cmd_exit(self) -> None:
+        if self._level.dirty and not self._confirm_discard():
+            return
+        self.userExit()
 
     def _confirm_discard(self) -> bool:
         return messagebox.askyesno(

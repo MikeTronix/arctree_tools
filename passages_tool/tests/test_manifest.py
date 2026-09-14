@@ -23,28 +23,39 @@ def test_build_manifest():
     level.add_polyline(ep)
 
     manifest = build_manifest(level)
-    assert len(manifest) == 2
+    assert manifest["version"] == 2
+    edges = manifest["edges"]
+    assert len(edges) == 4                       # 2 undirected edges → 4 directed
 
     # Check v0000_to_v0001
-    assert "v0000_to_v0001" in manifest
-    m1 = manifest["v0000_to_v0001"]
+    assert "v0000_to_v0001" in edges
+    m1 = edges["v0000_to_v0001"]
     assert m1["image_path"] == "render_v0000_to_v0001.png"
     assert m1["eyepoint_xyz"] == [0.0, 0.0, 1.6]
     assert m1["facing_xyz"] == [3.0, 4.0, 1.6]
     assert m1["rendered"] is False
+    assert "visible_anchors" not in m1           # visibility moved to eyepoints
 
     # Check v0001_to_v0002
-    assert "v0001_to_v0002" in manifest
-    m2 = manifest["v0001_to_v0002"]
+    assert "v0001_to_v0002" in edges
+    m2 = edges["v0001_to_v0002"]
     assert m2["eyepoint_xyz"] == [3.0, 4.0, 1.6]
     assert m2["facing_xyz"] == [3.0, 10.0, 1.6]
 
+    # One eyepoint entry per EyePath vertex
+    assert set(manifest["eyepoints"].keys()) == {"v0000", "v0001", "v0002"}
+    assert manifest["eyepoints"]["v0000"]["xyz"] == [0.0, 0.0, 1.6]
+
 
 def test_find_stale_and_missing_images(tmp_path):
-    # Dummy manifest with 2 edges
+    # Dummy manifest (version 2 nested) with 2 edges
     manifest = {
-        "v0000_to_v0001": {"image_path": "render_v0000_to_v0001.png"},
-        "v0001_to_v0002": {"image_path": "render_v0001_to_v0002.png"},
+        "version": 2,
+        "edges": {
+            "v0000_to_v0001": {"image_path": "render_v0000_to_v0001.png"},
+            "v0001_to_v0002": {"image_path": "render_v0001_to_v0002.png"},
+        },
+        "eyepoints": {},
     }
 
     # Create dummy directory

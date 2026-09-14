@@ -9,7 +9,12 @@ import math
 from dataclasses import dataclass
 from typing import Optional
 
-from passages_tool.editor.level import Level, PolylineType
+from passages_tool.editor.level import (
+    Level,
+    PolylineType,
+    interval_edge_indices,
+    wall_edge_index_pairs,
+)
 
 
 @dataclass
@@ -21,13 +26,77 @@ class ValidationWarning:
     message: str
 
 
+def validate_textures(level: Level) -> list[ValidationWarning]:
+    """
+    Warn about assignable surfaces with no texture assigned — these render
+    transparent. Checks every Wall edge (via its texture_intervals) plus the
+    level floor and ceiling.
+
+    Reuses ValidationWarning: `arch_id` carries the polyline id to highlight
+    (empty for floor/ceiling, which are level-meta, not polylines).
+    """
+    warnings: list[ValidationWarning] = []
+
+    # ── Walls: every edge must be covered by an interval with a real texture ──
+    for pl in level.polylines.values():
+        if pl.type != PolylineType.WALL:
+            continue
+        n = len(pl.vertices)
+        if n < 2:
+            continue
+        edge_count = len(wall_edge_index_pairs(pl))
+        if edge_count == 0:
+            continue
+
+        covered: set[int] = set()
+        for iv in pl.texture_intervals:
+            if not iv.texture:
+                continue  # interval present but no texture -> not covered
+            for e in interval_edge_indices(pl, iv):
+                if 0 <= e < edge_count:
+                    covered.add(e)
+
+        uncovered = [e for e in range(edge_count) if e not in covered]
+        if uncovered:
+            shown = ", ".join(str(e) for e in uncovered[:8])
+            more = "" if len(uncovered) <= 8 else f" (+{len(uncovered) - 8} more)"
+            msg = (
+                f"Wall {pl.id[:8]}... has {len(uncovered)} untextured edge(s) "
+                f"[{shown}{more}] — they will render transparent."
+            )
+            warnings.append(
+                ValidationWarning(
+                    arch_id=pl.id,
+                    v_from=uncovered[0],
+                    v_to=min(uncovered[0] + 1, n - 1),
+                    angle_deg=0.0,
+                    message=msg,
+                )
+            )
+
+    # ── Floor / ceiling (level meta) ─────────────────────────────────────────
+    if not level.meta.floor_texture:
+        warnings.append(ValidationWarning(
+            arch_id="", v_from=-1, v_to=-1, angle_deg=0.0,
+            message="Floor has no texture assigned (Level Properties > floor) — it will render transparent.",
+        ))
+    if not level.meta.ceiling_texture:
+        warnings.append(ValidationWarning(
+            arch_id="", v_from=-1, v_to=-1, angle_deg=0.0,
+            message="Ceiling has no texture assigned (Level Properties > ceiling) — it will render transparent.",
+        ))
+
+    return warnings
+
+
 def validate_arch_visibility(
     level: Level,
-    threshold_deg: float = 60.0,
+    threshold_deg: float = 30.0,
 ) -> list[ValidationWarning]:
     """
     Validates that no fixed-rotation arches within fog_end range are edge-on
     from any EyePath directed viewpoint.
+    Measured relative to the arch plane (90 = face-on, 0 = edge-on).
     """
     warnings = []
 
@@ -85,15 +154,15 @@ def validate_arch_visibility(
             nx = math.cos(theta_rad)
             ny = math.sin(theta_rad)
 
-            # Angle between normal and view vector
+            # Angle between view vector and arch plane (90 = face-on, 0 = edge-on)
             dot_val = vx * nx + vy * ny
             abs_dot = min(1.0, max(-1.0, abs(dot_val)))
-            angle_rad = math.acos(abs_dot)
+            angle_rad = math.asin(abs_dot)
             angle_deg = math.degrees(angle_rad)
 
-            if angle_deg > threshold_deg:
+            if angle_deg < threshold_deg:
                 msg = (
-                    f"Arch {arch.id[:8]}... is edge-on (view angle {angle_deg:.1f}° > {threshold_deg}°) "
+                    f"Arch {arch.id[:8]}... is edge-on (view angle {angle_deg:.1f}° < {threshold_deg}°) "
                     f"when looking from vertex {v_from} to {v_to}."
                 )
                 warnings.append(
