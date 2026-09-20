@@ -292,12 +292,15 @@ class InputMixin:
         from passages_tool.editor.validator import (
             validate_arch_visibility,
             validate_structure,
+            validate_style,
             validate_textures,
         )
+        tex_dir = self._tex.base_dir
         self._validation_warnings = (
             validate_structure(self._level)
             + validate_arch_visibility(self._level)
             + validate_textures(self._level)
+            + validate_style(self._level, tex_dir)
         )
         self._rebuild_all_highlights()
 

@@ -10,12 +10,22 @@ from dataclasses import dataclass
 from typing import Optional
 
 from passages_tool.editor.arch_utils import arch_view_angle
+from pathlib import Path
+
 from passages_tool.editor.level import (
     Level,
     PolylineType,
     _texture_intervals_overlap,
     interval_edge_indices,
     wall_edge_index_pairs,
+)
+from passages_tool.textures.style import (
+    BUILTIN_OPENING_PROFILES,
+    StyleError,
+    load_level_style,
+    preset_dir,
+    preset_has_diffuse,
+    style_json_path,
 )
 
 
@@ -109,6 +119,61 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
             message="Ceiling has no texture assigned (Level Properties > ceiling) — it will render transparent.",
         ))
 
+    return warnings
+
+
+def validate_style(
+    level: Level,
+    texture_dir: Optional[Path] = None,
+) -> list[ValidationWarning]:
+    """S1: style JSON present and presets exist. No compose. Skip if no style."""
+    warnings: list[ValidationWarning] = []
+    style_id = (level.meta.style or "").strip()
+    if not style_id:
+        return warnings
+
+    def _w(kind: str, message: str) -> None:
+        warnings.append(ValidationWarning(kind=kind, target_id="", message=message))
+
+    if texture_dir is None:
+        _w(
+            "style_no_texture_dir",
+            f"Level style {style_id!r} is set but no texture folder is loaded; "
+            "cannot check the style pack.",
+        )
+        return warnings
+
+    tex = Path(texture_dir)
+    path = style_json_path(tex, style_id)
+    if not path.is_file():
+        _w("style_missing", f"Style {style_id!r} not found at {path}.")
+        return warnings
+    try:
+        pack = load_level_style(tex, style_id)
+    except StyleError as e:
+        _w("style_invalid", str(e))
+        return warnings
+
+    for pid in pack.preset_ids():
+        if preset_dir(tex, pid) is None:
+            _w(
+                "preset_unsafe_id",
+                f"Style {pack.id!r} preset {pid!r} is not a simple directory name.",
+            )
+            continue
+        if not preset_has_diffuse(tex, pid):
+            _w(
+                "preset_missing_diffuse",
+                f"Style {pack.id!r} preset {pid!r} has no presets/{pid}/diffuse.png.",
+            )
+
+    unknown = [p for p in pack.opening_profiles if p not in BUILTIN_OPENING_PROFILES]
+    if unknown:
+        _w(
+            "style_unknown_profile",
+            f"Style {pack.id!r} opening_profiles has unknown names {unknown}; "
+            f"v1 ships {list(BUILTIN_OPENING_PROFILES)}.",
+        )
     return warnings
 
 

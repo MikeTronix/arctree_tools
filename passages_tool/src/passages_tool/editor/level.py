@@ -35,7 +35,9 @@ File format v2 summary
     "texture_pixel_size": float,
     "fog_start": float, "fog_end": float,
     "snap_grid": float,
-    "floor_texture": str | null, "ceiling_texture": str | null
+    "floor_texture": str | null, "ceiling_texture": str | null,
+    "style": str (optional), "overlay_seed": int (optional),
+    "pom_enabled": bool (optional, default false)
   },
   "polylines": [
     { "id": str, "type": "wall",
@@ -133,6 +135,13 @@ class LevelMeta:
     # Floor / ceiling textures
     floor_texture:   Optional[str] = None
     ceiling_texture: Optional[str] = None
+
+    # Style dressing (S1). Absent / None ⇒ today’s interval PNGs. No visual
+    # change until S2 compose. ``style`` is an id (``styles/<id>.json``) or a
+    # path relative to the texture directory.
+    style: Optional[str] = None
+    overlay_seed: Optional[int] = None
+    pom_enabled: bool = False
 
 
 
@@ -433,24 +442,31 @@ class Level:
     def to_dict(self) -> dict:
         self.sync_derived_fov_h()
         m = self.meta
+        meta = {
+            "name":               m.name,
+            "author":             m.author,
+            "wall_height":        m.wall_height,
+            "eye_height":         m.eye_height,
+            "fov_h":              m.fov_h,
+            "fov_v":              m.fov_v,
+            "pixels_per_meter":   m.pixels_per_meter,
+            "fog_start":          m.fog_start,
+            "fog_end":            m.fog_end,
+            "snap_grid":          m.snap_grid,
+            "render_width":       m.render_width,
+            "render_height":      m.render_height,
+            "floor_texture":      m.floor_texture,
+            "ceiling_texture":    m.ceiling_texture,
+        }
+        if m.style:
+            meta["style"] = m.style
+        if m.overlay_seed is not None:
+            meta["overlay_seed"] = int(m.overlay_seed)
+        if m.pom_enabled:
+            meta["pom_enabled"] = True
         return {
             "version": 2,
-            "meta": {
-                "name":               m.name,
-                "author":             m.author,
-                "wall_height":        m.wall_height,
-                "eye_height":         m.eye_height,
-                "fov_h":              m.fov_h,
-                "fov_v":              m.fov_v,
-                "pixels_per_meter":   m.pixels_per_meter,
-                "fog_start":          m.fog_start,
-                "fog_end":            m.fog_end,
-                "snap_grid":          m.snap_grid,
-                "render_width":       m.render_width,
-                "render_height":      m.render_height,
-                "floor_texture":      m.floor_texture,
-                "ceiling_texture":    m.ceiling_texture,
-            },
+            "meta": meta,
             "grid": {"cell_size": m.snap_grid},
             "polylines": [pl.to_dict() for pl in self.polylines.values()],
         }
@@ -481,6 +497,20 @@ class Level:
         m.render_height      = int(meta.get("render_height", config.DEFAULT_RENDER_HEIGHT))
         m.floor_texture      = meta.get("floor_texture")
         m.ceiling_texture    = meta.get("ceiling_texture")
+        raw_style = meta.get("style")
+        if isinstance(raw_style, str) and raw_style.strip():
+            m.style = raw_style.strip()
+        else:
+            m.style = None
+        raw_seed = meta.get("overlay_seed")
+        if isinstance(raw_seed, bool) or raw_seed is None:
+            m.overlay_seed = None
+        else:
+            try:
+                m.overlay_seed = int(raw_seed)
+            except (TypeError, ValueError):
+                m.overlay_seed = None
+        m.pom_enabled = bool(meta.get("pom_enabled", False))
         # fov_h is derived from fov_v + render aspect; ignore any stored value.
         level.sync_derived_fov_h()
 

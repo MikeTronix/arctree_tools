@@ -86,6 +86,9 @@ class TestLevelMeta:
         assert m.render_height      == 576
         assert m.floor_texture      is None
         assert m.ceiling_texture    is None
+        assert m.style              is None
+        assert m.overlay_seed       is None
+        assert m.pom_enabled        is False
 
     def test_meta_round_trip(self):
         level = Level()

@@ -26,7 +26,7 @@ Status: **done** · **partial** · **open**
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | 11 and 12 done; remaining items unscheduled |
 
-Tests at last 4.2 commit: **201 passed** (1 gpu skipped).
+Tests at last S1 commit: **211 passed** (1 gpu skipped).
 
 ---
 
@@ -46,6 +46,7 @@ Do not re-derive these; extend them.
 | `Level.sync_derived_fov_h()` | `editor/level.py` | Updates `meta.fov_h` without touching `dirty`. |
 | `History.redo(current_snapshot)` | `editor/history.py` | Pushes current onto `_undos` before popping redo (undo→redo→undo no longer skips). |
 | `validate_structure(level)` | `editor/validator.py` | Extra-EyePath warning. Called from editor Validate together with textures + arch visibility. |
+| `load_style` / `validate_style` | `textures/style.py`, `editor/validator.py` | S1 style pack. `LevelMeta.style` → `styles/<id>.json`. Missing presets warn; no compose. |
 | `build_scene(..., write_combined=True)` | `converter/scene_builder.py` | One geometry pass writes the four component eggs. Combined `scene.egg` is `<File>` includes of those eggs (`EggExternalReference`) — not a second tessellation. Preview and baker pass `write_combined=False`; converter CLI still writes combined for pview. |
 | `_write_egg(path, groups)` | `converter/scene_builder.py` | One-file EggData writer used by the four parts. Calls `parent_textures`. |
 | `parent_textures(egg, groups)` | `converter/egg_writer.py` | `add_child` each unique polygon-bound `EggTexture` onto the EggData being written. |
@@ -328,7 +329,7 @@ P2 architecture (including 5.5 EggContext texture parenting) is done. **4.1** mu
 
 **Style dressing** (`design_docs/passages_style_dressing_20SEP26.md`) is the primary dressing plan: environment **bands**, clicked **interruptions** (3D opening slabs vs POM niches), seeded **overlays**. The older index-map + 8-slot GPU plan (`passages_pom_metatexture_14SEP26.md`) is **superseded as authoring interchange**. Keep Phase 0 (custom GLSL offscreen **passed**), UV-in-meters, unique-map compose, and silhouette POM. Do not start old P1 (R-codes / arrays) unless a painted override mask is needed later.
 
-Next implementation: **S1** style JSON load (no visual change), then S2 band compose.
+**S1** style JSON load + Validate is done (`textures/style.py`, `LevelMeta.style` / `overlay_seed` / `pom_enabled`, `validate_style`). No compose — stills unchanged. Next: **S2** band compose.
 
 ---
 
