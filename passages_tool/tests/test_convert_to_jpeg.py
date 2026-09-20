@@ -118,6 +118,9 @@ def test_manifest_rewriting_v2_nested_edges(tmp_path):
     Image.new("RGBA", (10, 10), (0, 0, 0, 0)).save(
         input_dir / "mid_v0000_to_v0001.png", "PNG"
     )
+    Image.new("RGBA", (10, 10), (255, 0, 0, 255)).save(
+        input_dir / "yaw_v0000.png", "PNG"
+    )
 
     manifest_data = {
         "version": 2,
@@ -127,7 +130,13 @@ def test_manifest_rewriting_v2_nested_edges(tmp_path):
                 "midpoint_image_path": "mid_v0000_to_v0001.png",
             }
         },
-        "eyepoints": {"v0000": {"xyz": [0, 0, 1.7], "visible_anchors": {}}},
+        "eyepoints": {
+            "v0000": {
+                "xyz": [0, 0, 1.7],
+                "visible_anchors": {},
+                "yaw_strip": "yaw_v0000.png",
+            }
+        },
     }
     with open(input_dir / "manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest_data, f)
@@ -140,6 +149,7 @@ def test_manifest_rewriting_v2_nested_edges(tmp_path):
 
     assert rewritten["version"] == 2
     assert rewritten["eyepoints"]["v0000"]["xyz"] == [0, 0, 1.7]
+    assert rewritten["eyepoints"]["v0000"]["yaw_strip"] == "yaw_v0000.jpg"
     edge = rewritten["edges"]["v0000_to_v0001"]
     assert edge["image_path"] == "render_v0000_to_v0001.jpg"
     assert edge["midpoint_image_path"] == "mid_v0000_to_v0001.png"

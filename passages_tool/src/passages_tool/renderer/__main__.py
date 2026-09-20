@@ -42,6 +42,11 @@ def main() -> None:
         "--force", action="store_true", help="Force re-rendering all images."
     )
     parser.add_argument(
+        "--no-yaw-strip",
+        action="store_true",
+        help="Skip per-vertex cylindrical yaw strips (Feature 11). Stills and midpoints still bake.",
+    )
+    parser.add_argument(
         "--width", type=int, default=None, help="Render width (defaults to level parameter or 1024)."
     )
     parser.add_argument(
@@ -113,8 +118,7 @@ def main() -> None:
         to_render = find_missing_images(manifest, output_dir)
 
     if not to_render:
-        log.info("All viewpoints already rendered. Use --force to re-render.")
-        sys.exit(0)
+        log.info("All viewpoint stills already on disk.")
 
     # 3. Build scene geometry
     log.info("Building 3D scene geometry...")
@@ -209,7 +213,27 @@ def main() -> None:
         else:
             log.info("No EyePath edges found. Skipping midpoint frame baking.")
 
-        # 6. Final manifest rebuild to capture viewpoints and midpoints
+        if not args.no_yaw_strip:
+            from passages_tool.renderer.yaw_strip import bake_yaw_strips
+
+            log.info("Baking per-vertex yaw strips (optional turn-slew; stills unchanged)...")
+            yaw_r, yaw_s, yaw_f = bake_yaw_strips(
+                renderer, output_dir, width, height, args.force
+            )
+            log.info(
+                "Yaw strips: rendered %s. Skipped: %s. Failed: %s.",
+                yaw_r,
+                yaw_s,
+                yaw_f,
+            )
+            if yaw_f:
+                log.warning(
+                    "Yaw-strip failures are non-fatal; the client will keep still-to-still turns."
+                )
+        else:
+            log.info("Skipping yaw strips (--no-yaw-strip).")
+
+        # 6. Final manifest rebuild (picks up midpoints and optional yaw_strip keys)
         manifest = build_manifest(level, output_dir, tex_dir)
         save_manifest(manifest, save_path)
         log.info("Final manifest saved with all rendered assets.")

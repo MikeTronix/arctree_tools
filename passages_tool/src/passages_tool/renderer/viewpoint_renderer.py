@@ -61,8 +61,12 @@ class ViewpointRenderer:
         width: Optional[int],
         height: Optional[int],
         buffer_name: str,
+        fov_h: Optional[float] = None,
     ) -> bool:
-        """Place an offscreen camera at `pos`, look at `look_at`, write a PNG."""
+        """Place an offscreen camera at `pos`, look at `look_at`, write a PNG.
+
+        ``fov_h`` defaults to the still's derived HFOV. Cube faces pass 90°.
+        """
         eye_height = self.level.meta.eye_height
         fov_v = self.level.meta.fov_v
         render_w = width if width is not None else self.level.meta.render_width
@@ -79,7 +83,9 @@ class ViewpointRenderer:
 
         lens = PerspectiveLens()
         aspect_ratio = render_w / max(1, render_h)
-        fov_h_calc = derived_fov_h(fov_v, render_w, render_h)
+        fov_h_calc = float(fov_h) if fov_h is not None else derived_fov_h(
+            fov_v, render_w, render_h
+        )
         lens.set_aspect_ratio(aspect_ratio)
         lens.set_fov(fov_h_calc, fov_v)
         lens.set_near_far(CAMERA_NEAR, CAMERA_FAR)

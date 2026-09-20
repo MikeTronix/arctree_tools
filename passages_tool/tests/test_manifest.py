@@ -45,6 +45,35 @@ def test_build_manifest():
     # One eyepoint entry per EyePath vertex
     assert set(manifest["eyepoints"].keys()) == {"v0000", "v0001", "v0002"}
     assert manifest["eyepoints"]["v0000"]["xyz"] == [0.0, 0.0, 1.6]
+    assert "yaw_strip" not in manifest["eyepoints"]["v0000"]
+
+
+def test_build_manifest_yaw_strip_key_only_when_file_exists(tmp_path):
+    level = Level()
+    ep = Polyline.make_eyepath()
+    ep.vertices = [(0.0, 0.0), (1.0, 0.0)]
+    ep.edges = [(0, 1)]
+    level.add_polyline(ep)
+    (tmp_path / "yaw_v0000.png").write_bytes(b"")
+    manifest = build_manifest(level, output_dir=tmp_path)
+    assert manifest["eyepoints"]["v0000"]["yaw_strip"] == "yaw_v0000.png"
+    assert "yaw_strip" not in manifest["eyepoints"]["v0001"]
+
+
+def test_stale_yaw_only_when_manifest_opted_in(tmp_path):
+    manifest = {
+        "version": 2,
+        "edges": {"v0000_to_v0001": {"image_path": "render_v0000_to_v0001.png"}},
+        "eyepoints": {},
+    }
+    (tmp_path / "yaw_v0000.png").write_bytes(b"")
+    assert find_stale_images(manifest, tmp_path) == []
+
+    manifest["eyepoints"] = {"v0000": {"xyz": [0, 0, 1.7], "yaw_strip": "yaw_v0000.png"}}
+    (tmp_path / "yaw_v0009.png").write_bytes(b"")
+    stale_names = {p.name for p in find_stale_images(manifest, tmp_path)}
+    assert "yaw_v0009.png" in stale_names
+    assert "yaw_v0000.png" not in stale_names
 
 
 def test_build_manifest_two_eyepaths_uses_global_offsets():

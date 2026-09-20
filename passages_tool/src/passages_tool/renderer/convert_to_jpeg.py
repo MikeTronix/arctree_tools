@@ -187,6 +187,13 @@ def convert_renders(
                         # If midpoint PNG was recorded in manifest but file is missing
                         entry["midpoint_image_path"] = None
 
+            for rec in (manifest_data.get("eyepoints") or {}).values():
+                if not isinstance(rec, dict):
+                    continue
+                yaw_name = rec.get("yaw_strip")
+                if yaw_name and yaw_name in compiled_formats:
+                    rec["yaw_strip"] = Path(yaw_name).stem + compiled_formats[yaw_name]
+
             dest_manifest = output_path / "manifest.json"
             with open(dest_manifest, "w", encoding="utf-8") as f:
                 json.dump(manifest_data, f, indent=2)

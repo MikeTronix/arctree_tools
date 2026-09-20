@@ -16,6 +16,7 @@ Manifest shape (version 2 — see design_docs/passages_anchor_visibility_bake_06
       "eyepoints": {                   # one entry per EyePath vertex
         "v0000": {
           "xyz": [x, y, eye_height],
+          "yaw_strip": "yaw_v0000.png",  # optional; omit → client still-crossfade
           "visible_anchors": {         # occlusion candidates (view-independent)
             "<anchor_id>": {
               "world_xyz": [ax, ay, z_offset],
@@ -44,6 +45,7 @@ from typing import Any, Optional
 from passages_tool.editor.level import Level
 from passages_tool.renderer.occluder import build_occluders
 from passages_tool.renderer.occlusion import sample_grid_points, occlusion_coverage
+from passages_tool.renderer.yaw_strip import yaw_strip_filename
 
 MANIFEST_VERSION = 2
 
@@ -139,10 +141,17 @@ def build_manifest(
                     "distance": round(dist, 3),
                 }
 
-            manifest["eyepoints"][vid] = {
+            rec: dict[str, Any] = {
                 "xyz": [vpos[0], vpos[1], eye_height],
                 "visible_anchors": visible,
             }
+            # Optional: present only when the baker wrote a strip. Old manifests
+            # and clients omit this key and keep the still-to-still crossfade.
+            if output_dir is not None:
+                yaw_name = yaw_strip_filename(i)
+                if (Path(output_dir) / yaw_name).is_file():
+                    rec["yaw_strip"] = yaw_name
+            manifest["eyepoints"][vid] = rec
 
     return manifest
 
@@ -162,6 +171,7 @@ def load_manifest(path: Path) -> dict[str, Any]:
 
 # Regex to match output files like render_v0000_to_v0001.png, .jpg, or mid_v0000_to_v0001.ktx2
 _IMAGE_PATTERN = re.compile(r"^(?:render|mid)_v(\d{4})_to_v(\d{4})\.(png|jpg|jpeg|ktx2)$")
+_YAW_PATTERN = re.compile(r"^yaw_v(\d{4})\.(png|jpg|jpeg|ktx2)$")
 
 
 def find_stale_images(manifest: dict[str, Any], output_dir: Path) -> list[Path]:
@@ -171,16 +181,27 @@ def find_stale_images(manifest: dict[str, Any], output_dir: Path) -> list[Path]:
         return []
 
     edges = manifest.get("edges", {})
+    yaw_needed: set[str] = set()
+    for rec in (manifest.get("eyepoints") or {}).values():
+        if isinstance(rec, dict) and rec.get("yaw_strip"):
+            yaw_needed.add(Path(str(rec["yaw_strip"])).name)
     stale: list[Path] = []
     for file_path in p.iterdir():
-        if file_path.is_file():
-            match = _IMAGE_PATTERN.match(file_path.name)
-            if match:
-                v_from = int(match.group(1))
-                v_to = int(match.group(2))
-                key = f"v{v_from:04d}_to_v{v_to:04d}"
-                if key not in edges:
-                    stale.append(file_path)
+        if not file_path.is_file():
+            continue
+        match = _IMAGE_PATTERN.match(file_path.name)
+        if match:
+            v_from = int(match.group(1))
+            v_to = int(match.group(2))
+            key = f"v{v_from:04d}_to_v{v_to:04d}"
+            if key not in edges:
+                stale.append(file_path)
+            continue
+        # Only garbage-collect yaw strips when the manifest opted into them.
+        # Old bakes without the key must not delete leftover yaw_*.png.
+        yaw_m = _YAW_PATTERN.match(file_path.name)
+        if yaw_m and yaw_needed and file_path.name not in yaw_needed:
+            stale.append(file_path)
     return stale
 
 

@@ -218,4 +218,4 @@ Levels are serialized to JSON in a version 2 format that stores scale details, t
 }
 ```
 
-`fov_h` is **derived** from `fov_v` and `render_width`/`render_height` on load and save (here 60° V at 1024×576 ≈ 91.5° H). Do not author it independently. `grid.cell_size` is an unused on-disk alias of `snap_grid`. A legacy `tiles` array is ignored on load and not written. EyePath `edges` are directed. Multiple EyePaths are merged in map order with a global vertex offset (the first path keeps `v0000_to_v0001`; a second path continues at the next index).
+`fov_h` is **derived** from `fov_v` and `render_width`/`render_height` on load and save (here 60° V at 1024×576 ≈ 91.5° H). Do not author it independently. `grid.cell_size` is an unused on-disk alias of `snap_grid`. A legacy `tiles` array is ignored on load and not written. EyePath `edges` are directed. Multiple EyePaths are merged in map order with a global vertex offset (the first path keeps `v0000_to_v0001`; a second path continues at the next index). Optional per-vertex `yaw_vXXXX` strips (four 90° faces) enable turn slew; old manifests without `eyepoints.*.yaw_strip` keep still-to-still turns.
