@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from panda3d.core import CS_zup_right, Fog, LColor, NodePath, Filename
-from panda3d.egg import EggData
+from panda3d.egg import EggData, EggExternalReference
 
 from passages_tool.converter.egg_writer import parent_textures
 from passages_tool.converter.arch_builder import build_arches
@@ -18,6 +18,9 @@ from passages_tool.converter.floor_ceiling_builder import build_ceiling, build_f
 from passages_tool.converter.lighting_builder import setup_lighting
 from passages_tool.converter.wall_builder import build_wall_strips
 from passages_tool.editor.level import Level
+
+# Component eggs written by one geometry pass. scene.egg <File>-includes these.
+COMPONENT_EGG_STEMS: tuple[str, ...] = ("walls", "floor", "ceiling", "arches")
 
 
 def _write_egg(path: Path, groups) -> None:
@@ -29,6 +32,20 @@ def _write_egg(path: Path, groups) -> None:
     egg.write_egg(Filename.from_os_specific(str(path)))
 
 
+def _write_combined_scene(path: Path, stems: tuple[str, ...] = COMPONENT_EGG_STEMS) -> None:
+    """Write scene.egg as <File> includes — no second tessellation.
+
+    Egg nodes cannot be dual-parented after the component writes, so the
+    combined file references those eggs instead of rebuilding meshes.
+    pview resolves the includes when the four files sit next to scene.egg.
+    """
+    egg = EggData()
+    egg.set_coordinate_system(CS_zup_right)
+    for stem in stems:
+        egg.add_child(EggExternalReference(stem, f"{stem}.egg"))
+    egg.write_egg(Filename.from_os_specific(str(path)))
+
+
 def build_scene(
     level: Level,
     output_dir: Path,
@@ -37,8 +54,8 @@ def build_scene(
 ) -> Path:
     """
     Assemble and export individual wall, floor, ceiling, and arch EGG meshes.
-    When `write_combined` is True, also write scene.egg (a second geometry
-    pass, for pview). The runtime loader uses the four component files, so
+    When `write_combined` is True, also write scene.egg as <File> includes of
+    those four (for pview). The runtime loader uses the component files, so
     in-editor preview and the baker can skip the combined file.
     Returns the path to scene.egg if written, otherwise walls.egg.
     """
@@ -56,15 +73,7 @@ def build_scene(
 
     scene_path = output_dir / "scene.egg"
     if write_combined:
-        # Groups are already parented to the component EggData objects, so the
-        # combined file is a second build. Skip this in the editor/baker.
-        # Second geometry pass — groups cannot be dual-parented.
-        combined = (
-            list(build_wall_strips(level, tex_dir))
-            + [build_floor(level, tex_dir), build_ceiling(level, tex_dir)]
-            + list(build_arches(level, tex_dir))
-        )
-        _write_egg(scene_path, combined)
+        _write_combined_scene(scene_path)
         return scene_path
     return output_dir / "walls.egg"
 

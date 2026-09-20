@@ -319,11 +319,14 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 From the tool directory (venv created by `run.bat`):
 
 ```bat
-REM Geometry only (includes combined scene.egg for pview)
+REM Geometry only (component eggs + scene.egg File-includes for pview)
 .venv\Scripts\python.exe -m passages_tool.converter json\verify.passages.json scene_out --textures assets\sample_textures
 
 REM Viewpoints + midpoints + manifest (no combined scene.egg)
 bake.bat verify
+
+REM pview the combined file from scene_out so the <File> includes resolve
+REM pview scene_out\scene.egg
 
 REM Optional KTX2 / JPEG
 .venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
