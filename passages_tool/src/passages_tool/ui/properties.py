@@ -40,10 +40,10 @@ from typing import Callable, Optional
 
 from passages_tool.config import (
     INTERVAL_COLORS,
-    PALETTE_PANEL_W,
     PROPS_PANEL_W,
 )
 from passages_tool.editor.level import Level, Polyline, PolylineType
+from passages_tool.ui.scale import overlay_top_px, scaled_px
 
 
 _TYPE_LABELS = ["Wall", "Arch", "EyePath", "Anchor"]
@@ -83,6 +83,10 @@ class PropertiesPanel:
         self._selected_vertex_idx: Optional[int] = None
         self._preview_target_idx: int = 0
         self._preview_image_ref: Optional[object] = None
+        self._ui_scale: float = 1.0
+
+    def _px(self, base: float) -> float:
+        return scaled_px(base, self._ui_scale)
 
     # ── Helper: integer stepper control ──────────────────────────────────────
 
@@ -104,7 +108,7 @@ class PropertiesPanel:
         if imgui.small_button(f"-##{uid}"):
             value = max(min_v, value - 1)
         imgui.same_line()
-        imgui.set_next_item_width(width)
+        imgui.set_next_item_width(self._px(width))
         changed, nv = imgui.input_int(f"##{uid}v", value, step=0)
         if changed:
             value = max(min_v, min(nv, max_v))
@@ -121,12 +125,15 @@ class PropertiesPanel:
         polyline:    Optional[Polyline],
         palette_sel: Optional[str],
         level:       Optional[Level] = None,
+        ui_scale:    float = 1.0,
     ) -> None:
         """Render the properties panel. Must be called inside an imgui frame."""
         try:
             from imgui_bundle import imgui
         except ImportError:
             return
+
+        self._ui_scale = ui_scale
 
         # Reset selected vertex preview state if the selected polyline changes
         cur_id = polyline.id if polyline else None
@@ -137,15 +144,17 @@ class PropertiesPanel:
 
         display_w = imgui.get_io().display_size.x
         display_h = imgui.get_io().display_size.y
-        panel_h   = display_h - 20
+        bar_h     = overlay_top_px(imgui, ui_scale)
+        panel_w   = self._px(PROPS_PANEL_W)
+        panel_h   = display_h - bar_h
 
         always      = imgui.Cond_.always.value
         no_move     = imgui.WindowFlags_.no_move.value
         no_resize   = imgui.WindowFlags_.no_resize.value
         no_collapse = imgui.WindowFlags_.no_collapse.value
 
-        imgui.set_next_window_size((PROPS_PANEL_W, panel_h), always)
-        imgui.set_next_window_pos((display_w - PROPS_PANEL_W, 20), always)
+        imgui.set_next_window_size((panel_w, panel_h), always)
+        imgui.set_next_window_pos((display_w - panel_w, bar_h), always)
 
         opened, _ = imgui.begin("Properties",
                                 flags=no_move | no_resize | no_collapse)
@@ -269,7 +278,7 @@ class PropertiesPanel:
                         fn(polyline.id, i, None)
 
             # x_offset
-            imgui.set_next_item_width(80)
+            imgui.set_next_item_width(self._px(80))
             xc, nx = imgui.input_float(f"x_off##{i}", iv.x_offset,
                                        step=0.1, format="%.1f")
             if xc:
@@ -346,10 +355,10 @@ class PropertiesPanel:
         imgui.text_colored((0.25, 0.82, 0.91, 1.0), "Position")
         if polyline.vertices:
             px, pz = polyline.vertices[0]
-            imgui.set_next_item_width(100)
+            imgui.set_next_item_width(self._px(100))
             cx, nx = imgui.input_float("x##arch_px", px, format="%.2f")
             imgui.same_line()
-            imgui.set_next_item_width(100)
+            imgui.set_next_item_width(self._px(100))
             cz, nz = imgui.input_float("y##arch_py", pz, format="%.2f")
             if cx or cz:
                 fn = self._cb.get("move_vertex")
@@ -609,9 +618,8 @@ class PropertiesPanel:
             if self._preview_image_ref is not None:
                 imgui.separator()
                 imgui.text("Preview:")
-                # Display 3D preview image (aspect ratio 16:9, fit in properties panel width)
-                # PROPS_PANEL_W is 320, minus padding is 304 width, 171 height
-                imgui.image(self._preview_image_ref, (304, 171))
+                avail_w = imgui.get_content_region_avail().x
+                imgui.image(self._preview_image_ref, (avail_w, avail_w * 9.0 / 16.0))
 
     # ── ANCHOR ────────────────────────────────────────────────────────────────
 
@@ -620,10 +628,10 @@ class PropertiesPanel:
         imgui.text_colored((0.72, 0.64, 1.00, 1.0), "Position")
         if polyline.vertices:
             px, pz = polyline.vertices[0]
-            imgui.set_next_item_width(100)
+            imgui.set_next_item_width(self._px(100))
             cx, nx = imgui.input_float("x##anchor_px", px, format="%.2f")
             imgui.same_line()
-            imgui.set_next_item_width(100)
+            imgui.set_next_item_width(self._px(100))
             cz, nz = imgui.input_float("y##anchor_py", pz, format="%.2f")
             if cx or cz:
                 fn = self._cb.get("move_vertex")
@@ -739,10 +747,10 @@ class PropertiesPanel:
             else:
                 imgui.text(f"[{i}]")
             imgui.same_line()
-            imgui.set_next_item_width(85)
+            imgui.set_next_item_width(self._px(85))
             cx, nx = imgui.input_float(f"x##{i}", vx, format="%.2f")
             imgui.same_line()
-            imgui.set_next_item_width(85)
+            imgui.set_next_item_width(self._px(85))
             cz, nz = imgui.input_float(f"y##{i}", vz, format="%.2f")
 
             if cx or cz:
@@ -819,7 +827,7 @@ class PropertiesPanel:
         # fov_v is authored; fov_h is derived from VFOV × render aspect.
         imgui.text("FOV Vertical:")
         imgui.same_line()
-        imgui.set_next_item_width(80)
+        imgui.set_next_item_width(self._px(80))
         changed_v, fv_val = imgui.input_float("##meta_fovv", m.fov_v, format="%.1f")
         if changed_v and fn:
             fn("fov_v", max(1.0, min(179.0, fv_val)))
@@ -841,10 +849,10 @@ class PropertiesPanel:
 
         # fog_start / fog_end
         imgui.text("Fog Start / End:")
-        imgui.set_next_item_width(80)
+        imgui.set_next_item_width(self._px(80))
         changed_fs, fs_val = imgui.input_float("##meta_fogs", m.fog_start, format="%.1f")
         imgui.same_line()
-        imgui.set_next_item_width(80)
+        imgui.set_next_item_width(self._px(80))
         changed_fe, fe_val = imgui.input_float("##meta_foge", m.fog_end, format="%.1f")
         if changed_fs and fn:
             fn("fog_start", max(0.0, fs_val))
@@ -866,10 +874,10 @@ class PropertiesPanel:
 
         # render_width / render_height
         imgui.text("Width / Height:")
-        imgui.set_next_item_width(80)
+        imgui.set_next_item_width(self._px(80))
         changed_rw, rw_val = imgui.input_int("##meta_rw", m.render_width)
         imgui.same_line()
-        imgui.set_next_item_width(80)
+        imgui.set_next_item_width(self._px(80))
         changed_rh, rh_val = imgui.input_int("##meta_rh", m.render_height)
         if changed_rw and fn:
             fn("render_width", max(1, rw_val))

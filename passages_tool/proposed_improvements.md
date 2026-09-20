@@ -24,9 +24,9 @@ Status: **done** · **partial** · **open**
 | §5 P2 architecture | **done** | 5.1–5.8 done. Combined `scene.egg` is still a second geometry pass (4.2) |
 | §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat`/`bake.bat` share `_ensure_venv.bat` (repairs leftover Miniconda venvs); rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
-| §8 Feature opportunities | **open** | After remaining P1 forks |
+| §8 Feature opportunities | **open** | 11 and 12 done; remaining items unscheduled |
 
-Tests at last yaw-strip Feature 11 commit: **190 passed** (1 gpu skipped).
+Tests at last Feature 12 commit: **198 passed** (1 gpu skipped).
 
 ---
 
@@ -61,7 +61,8 @@ Do not re-derive these; extend them.
 | `TOOL_ROOT` / `EDITOR_STATE_PATH` | `config.py` | Tool checkout root (not `src/`). |
 | `ViewportCamera.film_h`, `.win_w`, `.win_h` | `viewport/camera.py` | Resize-aware film and pick math. `_on_window_event` ignores offscreen buffers (`window != self.win`). |
 | `BackgroundGrid.rebuild(..., cell=)` | `viewport/grid.py` | Minor spacing from `meta.snap_grid`; doubles `cell` if more than ~240 lines would be drawn. `Level.grid.cell_size` is still serialized and unused. |
-| Editor state | `editor_state.json` (gitignored, tool root) | Remembers last texture directory. First launch scans `assets/sample_textures` if present. Texture scan is recursive (`relative/posix` names). |
+| Editor state | `editor_state.json` (gitignored, tool root) | Remembers last texture directory and `ui_scale`. First launch scans `assets/sample_textures` if present. Texture scan is recursive (`relative/posix` names). |
+| `clamp_ui_scale` / `resolve_ui_scale` / `apply_imgui_ui_scale` | `ui/scale.py` | Feature 12 overlay scale. imgui-bundle 1.92 uses `style.font_scale_main` (not `io.font_global_scale`) plus relative `style.scale_all_sizes`. Viewport world units stay 1:1. |
 
 Dirty tracking: `PassagesApp._saved_snapshot` + `_capture_saved` / `_refresh_dirty`. Do not trust `Level.from_dict().dirty` after undo.
 
@@ -312,7 +313,7 @@ Slider grouping is done via `_hist` coalesce. Command-pattern history is only ne
 9. JSON Schema for `.passages.json` and `manifest.json`.
 10. Drop tkinter file dialogs.
 11. **Turn slew from a per-node yaw strip (client + baker).** **done (compat).** Baker writes extra `yaw_vXXXX.png` (four 90° faces, ~341px tall at default 576). Manifest `eyepoints.*.yaw_strip` is **optional** — omitted on old bakes. Client pans a `fov_h` window (80–400 ms by |Δyaw|) then lands on the hi-res still; if the key or file is missing, the still-to-still crossfade is unchanged. `--no-yaw-strip` skips extras. Do not replace sharp viewpoints with the strip.
-12. **Adjustable / HiDPI UI scale (editor).** On high-resolution monitors the ImGui panels, menu bar, and vertex labels are too small to use at a normal sitting distance. Add a persistent UI scale (e.g. 100/125/150/200%, or a font-size slider) via `imgui.get_io().font_global_scale` and `style.scale_all_sizes`, stored in `editor_state.json`. Default could follow Windows DPI. Viewport world units stay unchanged; only overlay chrome and text grow.
+12. **Adjustable / HiDPI UI scale (editor).** **done.** View → UI Scale is 100/125/150/200%. Persisted as `ui_scale` in `editor_state.json`. First launch (no saved key) snaps Windows DPI/96 to the nearest preset. imgui-bundle 1.92: `style.font_scale_main` + relative `style.scale_all_sizes`. Side panels, vertex fields, and thumbnails grow; viewport world units, grid, and handle radii do not.
 
 Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into a content editor.
 
@@ -326,7 +327,7 @@ P2 architecture (including 5.5 EggContext texture parenting) is done. **4.1** mu
 
 **POM / meta-texturing** (`design_docs/passages_pom_metatexture_14SEP26.md`): Phase 0 **answered** on this GPU — custom GLSL writes into `make_texture_buffer` on hosts A/B/C (`python -m passages_tool.renderer.shader_probe`). `sampler2DArray` not proven. Remainder of the meta/POM plan is **shelved** until after 5.5 and the other queued work. Later POM is **silhouette-aware relief** (ray miss discards the geometric quad), not interior-only POM.
 
-Next: Feature 12 (HiDPI editor text). Meta/POM remainder stays shelved.
+Feature 12 (HiDPI editor text) is done. Remaining bake leftover: **4.2** combined `scene.egg`. Meta/POM remainder stays shelved.
 
 ---
 

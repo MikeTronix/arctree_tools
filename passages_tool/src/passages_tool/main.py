@@ -38,6 +38,12 @@ from passages_tool.log import configure_editor, get_logger
 from passages_tool.textures.manager import TextureManager
 from passages_tool.ui.palette import TexturePalette
 from passages_tool.ui.properties import PropertiesPanel
+from passages_tool.ui.scale import (
+    apply_imgui_ui_scale,
+    clamp_ui_scale,
+    resolve_ui_scale,
+    scaled_px,
+)
 from passages_tool.ui.toolbar import ToolMode, Toolbar
 from passages_tool.viewport.camera import ViewportCamera
 from passages_tool.viewport.grid import BackgroundGrid
@@ -80,7 +86,10 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
         self._pm    = PolylineManager(self.render)
         self._pm.level = self._level
         self._tex   = TextureManager()
-        self._restore_texture_dir()
+        editor_state = self._load_editor_state()
+        self._ui_scale = resolve_ui_scale(editor_state)
+        self._imgui_scale_applied = 1.0
+        self._restore_texture_dir(editor_state)
 
         self._rebuild_grid()
         self._refresh_title()
@@ -99,6 +108,7 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
             "toggle_snap": self._toggle_snap,
             "run_validation": self._run_validation,
             "exit":     self.cmd_exit,
+            "set_ui_scale": self._set_ui_scale,
         })
         self._palette = TexturePalette(
             self._tex,
@@ -153,6 +163,10 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
                 wantExplorerManager=False,
                 wantTimeSliderManager=False,
             )
+            self._imgui_scale_applied = 1.0
+            self._apply_imgui_ui_scale()
+            # Before p3dimgui's new_frame (sort=0) so font_scale_main is in effect.
+            self.taskMgr.add(self._ui_scale_task, "passages_ui_scale", sort=-1)
             self.taskMgr.add(self._imgui_frame, "passages_imgui_ui", sort=10)
             self._imgui_active = True
         except Exception:
@@ -173,16 +187,22 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
                 is_dirty     = self._level.dirty,
                 snap_enabled = self._snap_enabled,
                 snap_grid    = self._level.meta.snap_grid,
+                ui_scale     = self._ui_scale,
             )
-            self._palette.draw()
-            self._props.draw(sel_pl, self._palette.selected_name, self._level)
+            self._palette.draw(self._ui_scale)
+            self._props.draw(sel_pl, self._palette.selected_name, self._level, self._ui_scale)
             self._refresh_title()
 
             if self._arch_snap_pending:
                 from imgui_bundle import imgui
                 display_size = imgui.get_io().display_size
-                imgui.set_next_window_pos((display_size.x / 2 - 180, 50), imgui.Cond_.always.value)
-                imgui.set_next_window_size((360, 80), imgui.Cond_.always.value)
+                dlg_w = scaled_px(360, self._ui_scale)
+                dlg_h = scaled_px(80, self._ui_scale)
+                imgui.set_next_window_pos(
+                    (display_size.x / 2 - dlg_w / 2, scaled_px(50, self._ui_scale)),
+                    imgui.Cond_.always.value,
+                )
+                imgui.set_next_window_size((dlg_w, dlg_h), imgui.Cond_.always.value)
                 imgui.begin("Arch Alignment Snap", None,
                             imgui.WindowFlags_.no_title_bar.value |
                             imgui.WindowFlags_.no_resize.value |
@@ -193,7 +213,10 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
 
             if self._validation_warnings:
                 from imgui_bundle import imgui
-                imgui.set_next_window_size((400, 200), imgui.Cond_.first_use_ever.value)
+                imgui.set_next_window_size(
+                    (scaled_px(400, self._ui_scale), scaled_px(200, self._ui_scale)),
+                    imgui.Cond_.first_use_ever.value,
+                )
                 expanded, opened = imgui.begin("Validation Warnings", True)
                 if not opened:
                     self._validation_warnings = []
@@ -254,18 +277,22 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
         self._cam.zoom_to_fit(min(xs) - pad, max(xs) + pad, min(zs) - pad, max(zs) + pad)
         self._rebuild_grid()
 
-    def _restore_texture_dir(self) -> None:
-        saved: Optional[str] = None
-        if EDITOR_STATE_PATH.is_file():
-            try:
-                saved = json.loads(EDITOR_STATE_PATH.read_text(encoding="utf-8")).get(
-                    "texture_dir"
-                )
-            except (OSError, json.JSONDecodeError, AttributeError):
-                saved = None
+    def _load_editor_state(self) -> dict:
+        if not EDITOR_STATE_PATH.is_file():
+            return {}
+        try:
+            data = json.loads(EDITOR_STATE_PATH.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _restore_texture_dir(self, state: Optional[dict] = None) -> None:
+        if state is None:
+            state = self._load_editor_state()
+        saved = state.get("texture_dir") if isinstance(state, dict) else None
         candidates = []
         if saved:
-            candidates.append(Path(saved))
+            candidates.append(Path(str(saved)))
         candidates.append(TOOL_ROOT / "assets" / "sample_textures")
         for path in candidates:
             if path.is_dir():
@@ -273,13 +300,33 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
                 return
 
     def _save_editor_state(self) -> None:
-        data = {
-            "texture_dir": str(self._tex.base_dir) if self._tex.base_dir else None,
-        }
+        data = self._load_editor_state()
+        data["texture_dir"] = str(self._tex.base_dir) if self._tex.base_dir else None
+        data["ui_scale"] = self._ui_scale
         try:
             EDITOR_STATE_PATH.write_text(json.dumps(data, indent=2), encoding="utf-8")
         except OSError:
             pass
+
+    def _set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = clamp_ui_scale(scale)
+        self._save_editor_state()
+
+    def _apply_imgui_ui_scale(self) -> None:
+        try:
+            from imgui_bundle import imgui
+
+            self._imgui_scale_applied = apply_imgui_ui_scale(
+                imgui.get_style(),
+                target=self._ui_scale,
+                applied=self._imgui_scale_applied,
+            )
+        except Exception:
+            pass
+
+    def _ui_scale_task(self, task):
+        self._apply_imgui_ui_scale()
+        return task.cont
 
 
 def main() -> None:

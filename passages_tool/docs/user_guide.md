@@ -66,7 +66,7 @@ cd _local\tools\passages_tool
 tar -xf sample_assets.tar
 ```
 
-On first launch the editor auto-scans `assets/sample_textures/` if that folder exists. After you **Browse folder…**, the last path is remembered in `editor_state.json` (gitignored).
+On first launch the editor auto-scans `assets/sample_textures/` if that folder exists. After you **Browse folder…**, the last path is remembered in `editor_state.json` (gitignored). **View → UI Scale** (100/125/150/200%) is stored there too; with no saved value the first launch snaps to Windows DPI.
 
 ### Running from a terminal
 
@@ -109,7 +109,7 @@ That writes `scene_out/` (component `.egg` files), `renders_out/` (PNG viewpoint
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ File  Edit │ Select  Draw Wall  Place Arch  Draw EyePath  Place Anchor │ Snap │ Validate │ fps │
+│ File  Edit  View │ Select  Draw Wall  Place Arch  Draw EyePath  Place Anchor │ Snap │ Validate │ fps │
 ├────────────┬─────────────────────────────────────────────────┬───────────────┤
 │ Textures   │                                                 │ Properties    │
 │ [Browse…]  │              Viewport                           │ type-specific │
@@ -120,7 +120,7 @@ That writes `scene_out/` (component `.egg` files), `renders_out/` (PNG viewpoint
 
 | Region | Description |
 |---|---|
-| **Menu bar** | File / Edit, tool modes (colour-coded), snap toggle, Validate, FPS |
+| **Menu bar** | File / Edit / View (UI Scale), tool modes (colour-coded), snap toggle, Validate, FPS |
 | **Textures** (left) | Recursive thumbnail browser |
 | **Viewport** (centre) | XZ plan of the level |
 | **Properties** (right) | Selected polyline, plus level-wide meta when nothing (or anything) is selected |
@@ -142,6 +142,8 @@ Orthographic camera looking along +Y. Editing is in the **XZ plane**.
 The background grid matches **snap spacing** (`meta.snap_grid`). Minor lines = snap; major lines every 8 minors. If snap is tiny, the drawer thins the lines so the view does not fill with ink.
 
 Letter shortcuts (`S` `W` `A` `E` `R` `G` `V`) and Delete are ignored while a text field in ImGui has focus. Ctrl+S still saves.
+
+**View → UI Scale** enlarges the menu bar, side panels, and vertex fields (100/125/150/200%). The grid and geometry stay in world metres — zoom the viewport separately. The choice is remembered in `editor_state.json`.
 
 ---
 
@@ -256,6 +258,7 @@ Flagged polylines turn red. Click **Select** on a warning to frame that object. 
 | Exit | File → Exit | window close / Alt+F4 |
 | Undo | Edit → Undo | `Ctrl+Z` |
 | Redo | Edit → Redo | `Ctrl+Y` |
+| UI Scale | View → UI Scale | 100 / 125 / 150 / 200% |
 
 New, Open, Exit, and the window **X** prompt if the document is dirty. Files use the `.passages.json` extension (added if omitted). v1 files migrate in memory on load; save to write v2. A `version` newer than 2 is refused.
 

@@ -16,6 +16,7 @@ A standalone Python + Panda3D application for designing, compiling, and baking 2
 - **Baking & Midpoint Renderer** — Offscreen bakes static viewpoint frames (PNG) and midpoint traversal frames (PNG) with player headlight illumination and fog depth fading.
 - **Shipping Transcoder** — Pillow and Basis Universal-based packaging script that compiles renders to `.ktx2` formats (with JPEG fallbacks) and alerts on any transparency anomalies before deployment.
 - **Undo / Redo** — Robust history snapshot stack (`Ctrl+Z` / `Ctrl+Y`).
+- **HiDPI / UI scale** — View → UI Scale (100/125/150/200%) enlarges ImGui chrome and vertex fields. Viewport world units are unchanged. Stored in `editor_state.json`; first launch follows Windows DPI.
 
 ---
 
@@ -145,6 +146,7 @@ python -m pytest
 | | Finish wall / eyepath | `Enter` or right-click |
 | | Arch snap accept / keep billboard | `Enter` / `Esc` |
 | **App** | Undo / Redo | `Ctrl+Z` / `Ctrl+Y` |
+| | UI Scale | View → UI Scale (100/125/150/200%) |
 | | New / Open / Save / Save As | `Ctrl+N` / `Ctrl+O` / `Ctrl+S` / `Ctrl+Shift+S` |
 
 Letter shortcuts are ignored while typing in an ImGui field.

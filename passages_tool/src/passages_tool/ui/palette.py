@@ -26,6 +26,7 @@ from typing import Callable, Optional
 
 from passages_tool.config import PALETTE_PANEL_W, THUMBNAIL_DISPLAY_SIZE, THUMBNAIL_H, THUMBNAIL_W
 from passages_tool.textures.manager import TextureManager
+from passages_tool.ui.scale import overlay_top_px, scaled_px
 
 
 class TexturePalette:
@@ -48,7 +49,7 @@ class TexturePalette:
     def select(self, name: Optional[str]) -> None:
         self._selected = name
 
-    def draw(self) -> None:
+    def draw(self, ui_scale: float = 1.0) -> None:
         """Render the palette panel. Must be called inside an imgui frame."""
         try:
             from imgui_bundle import imgui
@@ -57,7 +58,9 @@ class TexturePalette:
 
         # ── Panel position and size ────────────────────────────────────────────
         display_h = imgui.get_io().display_size.y
-        panel_h   = display_h - 20   # from below menu bar to window bottom
+        bar_h     = overlay_top_px(imgui, ui_scale)
+        panel_w   = scaled_px(PALETTE_PANEL_W, ui_scale)
+        panel_h   = display_h - bar_h
 
         # Cond_.always so position sticks even if imgui.ini saved something bad.
         always     = imgui.Cond_.always.value
@@ -66,8 +69,8 @@ class TexturePalette:
         no_collapse= imgui.WindowFlags_.no_collapse.value
         flags = no_move | no_resize | no_collapse
 
-        imgui.set_next_window_size((PALETTE_PANEL_W, panel_h), always)
-        imgui.set_next_window_pos((0, 20), always)
+        imgui.set_next_window_size((panel_w, panel_h), always)
+        imgui.set_next_window_pos((0, bar_h), always)
 
         opened, _ = imgui.begin("Textures", flags=flags)
         # Always call end() even if not opened.
@@ -93,10 +96,10 @@ class TexturePalette:
         if not names:
             imgui.text_wrapped("No textures found.\nClick 'Browse folder…'.")
         else:
-            tw = THUMBNAIL_DISPLAY_SIZE
-            th = THUMBNAIL_DISPLAY_SIZE
+            tw = scaled_px(THUMBNAIL_DISPLAY_SIZE, ui_scale)
+            th = tw
             avail_w = imgui.get_content_region_avail().x
-            cols = max(1, int(avail_w // (tw + 8)))
+            cols = max(1, int(avail_w // (tw + scaled_px(8, ui_scale))))
             col  = 0
 
             for name in names:
@@ -138,7 +141,7 @@ class TexturePalette:
                     avail_w = imgui.get_content_region_avail().x
                     orig_w  = orig_tex.getXSize() or 1
                     orig_h  = orig_tex.getYSize() or 1
-                    disp_w  = float(min(avail_w, PALETTE_PANEL_W - 16))
+                    disp_w  = float(min(avail_w, panel_w - scaled_px(16, ui_scale)))
                     disp_h  = disp_w * (orig_h / orig_w)
                     imgui.image(full_ref, (disp_w, disp_h))
 

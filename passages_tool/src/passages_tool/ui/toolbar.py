@@ -17,6 +17,8 @@ from __future__ import annotations
 from enum import Enum, auto
 from typing import Callable
 
+from passages_tool.config import UI_SCALE_PRESETS
+
 
 class ToolMode(Enum):
     SELECT       = auto()
@@ -48,6 +50,7 @@ class Toolbar:
         is_dirty: bool,
         snap_enabled: bool,
         snap_grid: float,
+        ui_scale: float = 1.0,
     ) -> None:
         """Render the top menu bar. Must be called inside an imgui frame."""
         try:
@@ -94,6 +97,17 @@ class Toolbar:
             if activated:
                 self._cb.get("redo", lambda: None)()
 
+            imgui.end_menu()
+
+        # ── View menu (UI scale; world units unchanged) ───────────────────────
+        if imgui.begin_menu("View"):
+            if imgui.begin_menu("UI Scale"):
+                for preset in UI_SCALE_PRESETS:
+                    selected = abs(ui_scale - preset) < 0.01
+                    activated, _ = imgui.menu_item(f"{int(preset * 100)}%", "", selected)
+                    if activated:
+                        self._cb.get("set_ui_scale", lambda _s: None)(preset)
+                imgui.end_menu()
             imgui.end_menu()
 
         # ── Tool buttons (inline in menu bar, colour-coded) ───────────────────
@@ -154,7 +168,7 @@ class Toolbar:
         fps_text = f"{fps:.0f} fps"
         fps_w    = imgui.calc_text_size(fps_text).x
         bar_w    = imgui.get_io().display_size.x
-        imgui.set_cursor_pos_x(bar_w - fps_w - 8)
+        imgui.set_cursor_pos_x(bar_w - fps_w - 8 * ui_scale)
         imgui.text_disabled(fps_text)
 
         imgui.end_main_menu_bar()

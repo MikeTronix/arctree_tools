@@ -100,11 +100,16 @@ COLOR_WALL_NO_INTERVAL = (0.45, 0.45, 0.45, 0.80)  # dim grey
 THUMBNAIL_W: int = 96
 THUMBNAIL_H: int = 96
 
-# Palette panel width in ImGui pixels.
+# Palette panel width in ImGui pixels (at UI scale 100%).
 PALETTE_PANEL_W: int = 300
 
-# Properties panel width in ImGui pixels.
+# Properties panel width in ImGui pixels (at UI scale 100%).
 PROPS_PANEL_W: int = 320
+
+# Editor overlay scale (Feature 12). Viewport world units are not scaled.
+UI_SCALE_PRESETS: tuple[float, ...] = (1.0, 1.25, 1.5, 2.0)
+UI_SCALE_MIN: float = 1.0
+UI_SCALE_MAX: float = 2.0
 
 # Thumbnail display size in the palette grid (the cached resolution is
 # THUMBNAIL_W x THUMBNAIL_H; this is the displayed size per cell).
