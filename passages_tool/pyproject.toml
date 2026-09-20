@@ -31,3 +31,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+markers = [
+    "gpu: requires a local Panda3D window/GPU; skipped unless PASSAGES_GPU=1",
+]

@@ -34,6 +34,7 @@ htmlcov/
 logs/
 imgui.ini
 editor_state.json
+shader_probe_result.json
 .venv_uv/
 
 # Level JSON files (ignore specific/intermediate level files, keep universal test levels)

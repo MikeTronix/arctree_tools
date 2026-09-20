@@ -323,7 +323,9 @@ P0, core P1, docs pass, per-room floors, and small leftovers are done. Geometric
 
 P2 union types are done. Remaining: **4.1** multi-EyePath bake (separate step, tool + minigame), **5.5** EggContext texture parenting.
 
-Next: Feature 11 (yaw-strip slew) is a minigame+baker project. Feature 12 (HiDPI / adjustable editor text) is editor-only and not implemented.
+**POM / meta-texturing** (`design_docs/passages_pom_metatexture_14SEP26.md`): Phase 0 **answered** on this GPU — custom GLSL writes into `make_texture_buffer` on hosts A/B/C (`python -m passages_tool.renderer.shader_probe`). `sampler2DArray` not proven. Remainder of the meta/POM plan is **shelved** until after 5.5 and the other queued work. Later POM is **silhouette-aware relief** (ray miss discards the geometric quad), not interior-only POM.
+
+Next after the probe: **5.5** EggContext texture parenting, then 4.1 / Feature 11 / Feature 12 as previously planned.
 
 ---
 
