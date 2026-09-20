@@ -1,6 +1,6 @@
 # Passages Minigame — Rendering System Design Document
 
-> **Status:** Partially superseded. Decisions locked as of 2026-06-16; tables below patched 2026-09-13 to match the shipping tool.
+> **Status:** Partially superseded. Decisions locked as of 2026-06-16; tables below patched 2026-09-13 to match the shipping tool. Dressing / POM / 3D openings: `design_docs/passages_style_dressing_20SEP26.md` (supersedes index-map metatexture as primary).
 > **Tool:** `_local/tools/passages_tool/`  
 > **Relates to:** `design_docs/arc_dev_spec_<latest>.md` (Passages minigame entry)
 >
