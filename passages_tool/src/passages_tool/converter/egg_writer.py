@@ -31,6 +31,11 @@ class EggContext:
         """
         Get or create an EggTexture node for a texture file name.
         Assumes texture paths are relative to the level's texture directory.
+
+        The node is cached only. Callers (or ``parent_textures``) must
+        ``add_child`` it onto the EggData that is actually written — this
+        context's ``self.data`` is discarded when builders reparent the
+        vertex pool onto a group.
         """
         if texture_name in self.textures:
             return self.textures[texture_name]
@@ -74,7 +79,43 @@ class EggContext:
 
     def write(self, path: str | Path) -> bool:
         """Write the egg data out to a file on disk."""
+        for tex in self.textures.values():
+            if tex.get_parent() is None:
+                self.data.add_child(tex)
         p = Path(path)
         p.parent.mkdir(parents=True, exist_ok=True)
         fn = Filename.from_os_specific(str(p))
         return self.data.write_egg(fn)
+
+
+def iter_bound_textures(node):
+    """Yield EggTexture objects referenced by polygons under ``node``."""
+    if hasattr(node, "get_num_textures"):
+        for i in range(node.get_num_textures()):
+            tex = node.get_texture(i)
+            if tex is not None:
+                yield tex
+    if hasattr(node, "get_first_child"):
+        child = node.get_first_child()
+        while child is not None:
+            yield from iter_bound_textures(child)
+            child = node.get_next_child()
+
+
+def parent_textures(egg: EggData, groups) -> None:
+    """``add_child`` each unique bound EggTexture onto ``egg`` if unparented.
+
+    Polygons can ``set_texture`` without the texture sitting in the egg
+    graph. ``write_egg`` then omits the ``<Texture>`` block and pview /
+    extra stages lose the map.
+    """
+    seen: set[int] = set()
+    for grp in groups:
+        for tex in iter_bound_textures(grp):
+            ident = id(tex)
+            if ident in seen:
+                continue
+            seen.add(ident)
+            parent = tex.get_parent()
+            if parent is None:
+                egg.add_child(tex)

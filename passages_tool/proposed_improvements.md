@@ -21,12 +21,12 @@ Status: **done** · **partial** · **open**
 | §2 P0 correctness / data-loss | **done** | Nested `b9011b6`; GitHub `6ed69e8` |
 | §3 P1 editor interaction | **done** | Nested `f07a0e3`; GitHub `b9f5b0a`; 3.13 typed warnings |
 | §4 P1 bake / converter | **partial** | Per-room floors; geometric midpoints kept; first EyePath only; 4.2 combined `scene.egg` still a second CLI pass |
-| §5 P2 architecture | **partial** | 5.1–5.4, 5.6–5.8 done; 5.5 EggContext still open |
+| §5 P2 architecture | **done** | 5.1–5.8 done. Combined `scene.egg` is still a second geometry pass (4.2) |
 | §6 Docs / onboarding | **done** | User guide rewritten; README shortcuts + 1024×576 sample; `run.bat`/`bake.bat` share `_ensure_venv.bat` (repairs leftover Miniconda venvs); rendering design marked superseded and tables patched |
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | After remaining P1 forks |
 
-Tests at last polyline-union commit: **175 passed**.
+Tests at last EggContext 5.5 commit: **181 passed** (1 gpu skipped).
 
 ---
 
@@ -47,7 +47,8 @@ Do not re-derive these; extend them.
 | `History.redo(current_snapshot)` | `editor/history.py` | Pushes current onto `_undos` before popping redo (undo→redo→undo no longer skips). |
 | `validate_structure(level)` | `editor/validator.py` | Extra-EyePath warning. Called from editor Validate together with textures + arch visibility. |
 | `build_scene(..., write_combined=True)` | `converter/scene_builder.py` | Writes the four component eggs from one geometry pass. Combined `scene.egg` is a **second** pass (Egg nodes cannot be dual-parented). Preview and baker pass `write_combined=False`; converter CLI still writes combined for pview. |
-| `_write_egg(path, groups)` | `converter/scene_builder.py` | One-file EggData writer used by the four parts. |
+| `_write_egg(path, groups)` | `converter/scene_builder.py` | One-file EggData writer used by the four parts. Calls `parent_textures`. |
+| `parent_textures(egg, groups)` | `converter/egg_writer.py` | `add_child` each unique polygon-bound `EggTexture` onto the EggData being written. |
 | `local_basisu_binary()` | `renderer/convert_to_jpeg.py` | `TOOL_ROOT/bin/basisu[.exe]`. Drop the encoder there; `bake.bat` still does not chain the transcoder. |
 | `_manifest_edge_entries(manifest)` | `renderer/convert_to_jpeg.py` | v2 nested `edges` plus legacy flat manifests. |
 | `PassagesApp._hist(key=None)` | `app/commands.py` | Snapshot undo. Repeating `key` coalesces slider/drag/meta edits; `key=None` always pushes. |
@@ -238,9 +239,9 @@ Runtime records are `Wall | Arch | EyePath | Anchor` (`editor/polyline_data.py`)
 
 `ViewpointRenderer._render_camera(pos, look_at, path, …)` owns buffer/lens/headlight/screenshot. `render_edge` looks from the start vertex; `render_midpoint` from the geometric 50% point. Placement is unchanged.
 
-### 5.5 Converter `EggContext` vs raw `EggData` — **open**
+### 5.5 Converter `EggContext` vs raw `EggData` — **done**
 
-`_write_egg` is a small step. Texture nodes still may not be `add_child`’d onto EggData.
+`parent_textures(egg, groups)` walks polygon `TRef`s and `add_child`s each unique `EggTexture` onto the EggData that `_write_egg` actually writes (builders reparent the vertex pool off `EggContext.data`, so putting textures there would drop them). Combined `scene.egg` uses the same helper. Tests: `tests/test_egg_writer.py`.
 
 ### 5.6 Tiles are dead — **done**
 
@@ -321,11 +322,11 @@ Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into
 
 P0, core P1, docs pass, per-room floors, and small leftovers are done. Geometric midpoints kept.
 
-P2 union types are done. Remaining: **4.1** multi-EyePath bake (separate step, tool + minigame), **5.5** EggContext texture parenting.
+P2 architecture (including 5.5 EggContext texture parenting) is done. Remaining: **4.1** multi-EyePath bake (separate step, tool + minigame), **4.2** combined `scene.egg` still a second pass.
 
 **POM / meta-texturing** (`design_docs/passages_pom_metatexture_14SEP26.md`): Phase 0 **answered** on this GPU — custom GLSL writes into `make_texture_buffer` on hosts A/B/C (`python -m passages_tool.renderer.shader_probe`). `sampler2DArray` not proven. Remainder of the meta/POM plan is **shelved** until after 5.5 and the other queued work. Later POM is **silhouette-aware relief** (ray miss discards the geometric quad), not interior-only POM.
 
-Next after the probe: **5.5** EggContext texture parenting, then 4.1 / Feature 11 / Feature 12 as previously planned.
+Next: **4.1** multi-EyePath bake (tool + minigame), then Feature 11 / Feature 12. Meta/POM remainder stays shelved.
 
 ---
 

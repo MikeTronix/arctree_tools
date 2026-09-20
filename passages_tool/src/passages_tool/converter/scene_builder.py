@@ -12,6 +12,7 @@ from typing import Any, Optional
 from panda3d.core import CS_zup_right, Fog, LColor, NodePath, Filename
 from panda3d.egg import EggData
 
+from passages_tool.converter.egg_writer import parent_textures
 from passages_tool.converter.arch_builder import build_arches
 from passages_tool.converter.floor_ceiling_builder import build_ceiling, build_floor
 from passages_tool.converter.lighting_builder import setup_lighting
@@ -22,9 +23,10 @@ from passages_tool.editor.level import Level
 def _write_egg(path: Path, groups) -> None:
     egg = EggData()
     egg.set_coordinate_system(CS_zup_right)
+    parent_textures(egg, groups)
     for grp in groups:
         egg.add_child(grp)
-    egg.write_egg(str(path))
+    egg.write_egg(Filename.from_os_specific(str(path)))
 
 
 def build_scene(
@@ -56,15 +58,13 @@ def build_scene(
     if write_combined:
         # Groups are already parented to the component EggData objects, so the
         # combined file is a second build. Skip this in the editor/baker.
-        scene_egg = EggData()
-        scene_egg.set_coordinate_system(CS_zup_right)
-        for grp in build_wall_strips(level, tex_dir):
-            scene_egg.add_child(grp)
-        scene_egg.add_child(build_floor(level, tex_dir))
-        scene_egg.add_child(build_ceiling(level, tex_dir))
-        for grp in build_arches(level, tex_dir):
-            scene_egg.add_child(grp)
-        scene_egg.write_egg(str(scene_path))
+        # Second geometry pass — groups cannot be dual-parented.
+        combined = (
+            list(build_wall_strips(level, tex_dir))
+            + [build_floor(level, tex_dir), build_ceiling(level, tex_dir)]
+            + list(build_arches(level, tex_dir))
+        )
+        _write_egg(scene_path, combined)
         return scene_path
     return output_dir / "walls.egg"
 
