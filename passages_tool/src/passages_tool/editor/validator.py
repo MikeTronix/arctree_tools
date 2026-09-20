@@ -113,21 +113,13 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
 
 
 def validate_structure(level: Level) -> list[ValidationWarning]:
-    """Warn about document-level issues (EyePath count, etc.)."""
-    warnings: list[ValidationWarning] = []
-    paths = level.eyepaths()
-    if len(paths) > 1:
-        extras = ", ".join(pl.id[:8] + "…" for pl in paths[1:3])
-        more = f" (+{len(paths) - 3} more)" if len(paths) > 3 else ""
-        warnings.append(ValidationWarning(
-            kind="extra_eyepath",
-            target_id=paths[1].id,
-            message=(
-                f"Level has {len(paths)} EyePath polylines; bake and preview use "
-                f"only the first. Extra: {extras}{more}."
-            ),
-        ))
-    return warnings
+    """Warn about document-level issues.
+
+    Multiple EyePaths are valid. Bake, preview, and the minigame merge them
+    with a global vertex offset so the first path's keys stay ``v0000_to_v0001``.
+    """
+    del level
+    return []
 
 
 def validate_arch_visibility(
@@ -141,22 +133,9 @@ def validate_arch_visibility(
     """
     warnings = []
 
-    # 1. Find EyePath polyline (bake/preview use the first; extras are warned separately)
-    paths = level.eyepaths()
-    eyepath_pl = paths[0] if paths else None
-
-    if not eyepath_pl or not eyepath_pl.edges:
-        return warnings
-
     fog_end = level.meta.fog_end
 
-    # 2. Iterate all directed EyePath edges (each represents a viewpoint)
-    for v_from, v_to in eyepath_pl.edges:
-        if v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
-            continue
-
-        p_from = eyepath_pl.vertices[v_from]
-        p_to = eyepath_pl.vertices[v_to]
+    for v_from, v_to, p_from, p_to in level.iter_eyepath_directed_edges():
 
         # Camera view vector (directed direction of movement/gaze)
         vx = p_to[0] - p_from[0]

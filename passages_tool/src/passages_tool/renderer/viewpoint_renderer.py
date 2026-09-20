@@ -47,11 +47,11 @@ class ViewpointRenderer:
     def _eyepath_endpoints(
         self, v_from: int, v_to: int
     ) -> Optional[tuple[tuple[float, float], tuple[float, float]]]:
-        paths = self.level.eyepaths()
-        eyepath_pl = paths[0] if paths else None
-        if not eyepath_pl or v_from >= len(eyepath_pl.vertices) or v_to >= len(eyepath_pl.vertices):
+        p_from = self.level.eyepath_vertex(v_from)
+        p_to = self.level.eyepath_vertex(v_to)
+        if p_from is None or p_to is None:
             return None
-        return eyepath_pl.vertices[v_from], eyepath_pl.vertices[v_to]
+        return p_from, p_to
 
     def _render_camera(
         self,

@@ -31,7 +31,8 @@ class PreviewMixin:
         renderer = None
         try:
             renderer = ViewpointRenderer(self._level, preview_dir, tex_dir)
-            renderer.render_edge(v_from, v_to, temp_png)
+            off = self._level.eyepath_offset(pid)
+            renderer.render_edge(off + v_from, off + v_to, temp_png)
         except Exception:
             log.exception("Error rendering preview")
             return
