@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "id": "crypt_ashlar",
+  "wall_height_m": 4.0,
+  "bands": [
+    {
+      "id": "plinth",
+      "z": [0.0, 0.4],
+      "preset": "stone_ashlar",
+      "tile_meters": [1.0, 0.4]
+    },
+    {
+      "id": "field",
+      "z": [0.4, 3.2],
+      "preset": "plaster_damp",
+      "tile_meters": [2.0, 2.0]
+    },
+    {
+      "id": "frieze",
+      "z": [3.2, 4.0],
+      "preset": "carved_frieze",
+      "tile_meters": [2.0, 0.8]
+    }
+  ],
+  "opening_profiles": ["rect", "round", "gothic"],
+  "default_opening": {
+    "profile": "gothic",
+    "depth_m": 0.4,
+    "side_preset": "stone_ashlar"
+  },
+  "niche": {
+    "height_scale_m": 0.35,
+    "pom": true
+  },
+  "overlays": {
+    "seed": 7,
+    "wetness": 0.12,
+    "moss": 0.06,
+    "graffiti": 0.0
+  },
+  "floor": {
+    "preset": "crypt_floor",
+    "tile_meters": [2.0, 2.0]
+  },
+  "ceiling": {
+    "preset": "crypt_ceiling",
+    "tile_meters": [2.0, 2.0]
+  }
+}

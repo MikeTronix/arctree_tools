@@ -15,6 +15,7 @@ from panda3d.egg import EggGroup, EggTexture
 from passages_tool.converter.egg_writer import EggContext
 from passages_tool.converter.opening import (
     is_3d_opening,
+    is_volume,
     opening_depth_m,
     opening_profile_name,
     profile_polyline,
@@ -145,6 +146,61 @@ def _add_quad(ctx, group, pts, tex, normal):
     poly = ctx.add_polygon(verts, tex)
     group.add_child(poly)
     return poly
+
+
+def _build_volume_box(
+    group: EggGroup,
+    ctx: EggContext,
+    p_left,
+    p_right,
+    width: float,
+    nx: float,
+    ny: float,
+    z_bottom: float,
+    z_top: float,
+    depth: float,
+    tex,
+) -> None:
+    """Pilaster/pillar: box flush on the wall, extruded into the room (+normal)."""
+    depth = max(0.05, float(depth))
+    w = max(1e-4, float(width))
+    n_out = (nx, ny, 0.0)
+    sx = (p_right[0] - p_left[0]) / w
+    sy = (p_right[1] - p_left[1]) / w
+    n_right = (sx, sy, 0.0)
+    n_left = (-sx, -sy, 0.0)
+
+    def W(s, z, along):
+        return _world_on_span(p_left, p_right, w, nx, ny, s, z, along)
+
+    # Front (into the room)
+    _add_quad(
+        ctx, group,
+        (W(0.0, z_bottom, depth), W(w, z_bottom, depth), W(w, z_top, depth), W(0.0, z_top, depth)),
+        tex, n_out,
+    )
+    # Left / right
+    _add_quad(
+        ctx, group,
+        (W(0.0, z_bottom, 0.0), W(0.0, z_bottom, depth), W(0.0, z_top, depth), W(0.0, z_top, 0.0)),
+        tex, n_left,
+    )
+    _add_quad(
+        ctx, group,
+        (W(w, z_bottom, depth), W(w, z_bottom, 0.0), W(w, z_top, 0.0), W(w, z_top, depth)),
+        tex, n_right,
+    )
+    # Top / bottom
+    _add_quad(
+        ctx, group,
+        (W(0.0, z_top, 0.0), W(0.0, z_top, depth), W(w, z_top, depth), W(w, z_top, 0.0)),
+        tex, (0.0, 0.0, 1.0),
+    )
+    _add_quad(
+        ctx, group,
+        (W(0.0, z_bottom, depth), W(0.0, z_bottom, 0.0), W(w, z_bottom, 0.0), W(w, z_bottom, depth)),
+        tex, (0.0, 0.0, -1.0),
+    )
 
 
 def _build_opening_slab(
@@ -314,6 +370,22 @@ def build_arches(
         else:
             v_bottom = 0.0
             v_top = (height * ppm) / tex_h
+
+        if is_volume(pl) and not is_billboard and width > 1e-6:
+            depth = opening_depth_m(pl, pack)
+            side_name = getattr(pl, "side_texture", None) or None
+            if not side_name and pack and pack.default_opening.side_preset:
+                side_name = f"presets/{pack.default_opening.side_preset}/diffuse.png"
+            if not side_name:
+                side_name = pl.texture
+            side_tex = ctx.get_or_create_texture(side_name) if side_name else egg_tex
+            _build_volume_box(
+                group, ctx, p_left, p_right, width, nx, ny,
+                z_bottom, z_top, depth, side_tex or egg_tex,
+            )
+            if group.get_first_child() is not None:
+                groups.append(group)
+            continue
 
         if is_3d_opening(pl) and not is_billboard and width > 1e-6:
             depth = opening_depth_m(pl, pack)

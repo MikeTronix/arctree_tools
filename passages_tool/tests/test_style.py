@@ -140,6 +140,28 @@ def test_validate_style_ok_when_presets_exist(tmp_path):
     assert validate_style(level, tmp_path) == []
 
 
+def test_demo_crypt_ashlar_pack_validates():
+    from passages_tool.config import TOOL_ROOT
+    from passages_tool.io.level_format import load
+
+    tex = TOOL_ROOT / "assets" / "sample_textures"
+    style = tex / "styles" / "crypt_ashlar.json"
+    if not style.is_file():
+        pytest.skip("demo style pack not present")
+    pack = load_style(style)
+    assert pack.id == "crypt_ashlar"
+    assert len(pack.bands) == 3
+    level = Level()
+    level.meta.style = "crypt_ashlar"
+    assert validate_style(level, tex) == []
+    demo = TOOL_ROOT / "json" / "style_demo.passages.json"
+    if demo.is_file():
+        loaded = load(demo)
+        assert loaded.meta.style == "crypt_ashlar"
+        kinds = {a.kind for a in loaded.arches()}
+        assert "opening" in kinds and "niche" in kinds and "volume" in kinds
+
+
 def test_level_style_round_trip_omits_defaults():
     level = Level()
     d = level.to_dict()

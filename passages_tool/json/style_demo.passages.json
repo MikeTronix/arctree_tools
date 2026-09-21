@@ -1,0 +1,70 @@
+{
+  "version": 2,
+  "meta": {
+    "name": "Style demo hall",
+    "author": "passages_tool",
+    "wall_height": 4.0,
+    "eye_height": 1.7,
+    "fov_v": 60.0,
+    "pixels_per_meter": 128.0,
+    "fog_start": 20.0,
+    "fog_end": 40.0,
+    "snap_grid": 0.5,
+    "render_width": 1024,
+    "render_height": 576,
+    "floor_texture": "presets/crypt_floor/diffuse.png",
+    "ceiling_texture": "presets/crypt_ceiling/diffuse.png",
+    "style": "crypt_ashlar",
+    "overlay_seed": 7
+  },
+  "grid": { "cell_size": 0.5 },
+  "polylines": [
+    {
+      "id": "aaaaaaaa-0001-4000-8000-000000000001",
+      "type": "wall",
+      "closed": true,
+      "vertices": [[0.0, 0.0], [0.0, 4.0], [10.0, 4.0], [10.0, 0.0]]
+    },
+    {
+      "id": "aaaaaaaa-0002-4000-8000-000000000002",
+      "type": "eyepath",
+      "vertices": [[2.0, 2.0], [8.0, 2.0]],
+      "edges": [[0, 1], [1, 0]]
+    },
+    {
+      "id": "aaaaaaaa-0003-4000-8000-000000000003",
+      "type": "arch",
+      "position": [5.0, 0.0],
+      "orientation": 90.0,
+      "width": 1.6,
+      "height_override": 2.4,
+      "z_offset": 0.0,
+      "kind": "opening",
+      "profile": "gothic",
+      "depth_m": 0.4,
+      "texture": "door.png",
+      "transparency": "alpha_test",
+      "auto_snap": false
+    },
+    {
+      "id": "aaaaaaaa-0004-4000-8000-000000000004",
+      "type": "arch",
+      "position": [2.0, 4.0],
+      "orientation": -90.0,
+      "width": 1.1,
+      "height_override": 1.8,
+      "z_offset": 0.4,
+      "kind": "niche"
+    },
+    {
+      "id": "aaaaaaaa-0005-4000-8000-000000000005",
+      "type": "arch",
+      "position": [8.0, 0.0],
+      "orientation": 90.0,
+      "width": 0.55,
+      "height_override": 4.0,
+      "kind": "volume",
+      "depth_m": 0.45
+    }
+  ]
+}

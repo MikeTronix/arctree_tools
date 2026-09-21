@@ -176,7 +176,7 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 One click. If you place near a wall, the tool offers a perpendicular snap: **Enter** accepts, **Esc** or another click / tool switch keeps **billboard**.
 
-For a thick door or window, keep a **fixed** angle and set `"kind": "opening"` (or `"depth_m"`) in the level JSON. For an alcove, `"kind": "niche"` plus `meta.style`. Billboard stays a card. There is no kind combo in Properties yet.
+For a thick door or window, keep a **fixed** angle and set `"kind": "opening"` (or `"depth_m"`) in the level JSON. For an alcove, `"kind": "niche"` plus `meta.style`. For a pillar, `"kind": "volume"` with a modest `width`/`depth_m`. Billboard stays a card. There is no kind combo in Properties yet.
 
 ### EyePaths
 
@@ -212,7 +212,7 @@ Names are paths relative to the folder (`base/brick.png` if nested). Folders nam
 
 A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Set `"style": "<id>"` on the level `meta` (no picker yet). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
 
-On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` leaves the wall and bakes a POM recess (needs the style). Overlay densities > 0 stamp wetness/moss/graffiti (seeded; 0 = unchanged bands).
+On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` leaves the wall and bakes a POM recess (needs the style); `"kind": "volume"` is an additive pilaster box. Overlay densities > 0 stamp wetness/moss/graffiti (seeded; 0 = unchanged bands). Demo: `json/style_demo.passages.json` with `styles/crypt_ashlar.json`.
 
 Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`.
 
@@ -324,7 +324,7 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
 | Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
 | EyePath `edges` | Directed `[from, to]` pairs |
-| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` or `depth_m`>0 → 3D slab + wall punch. `niche` → POM dip, wall intact (needs style) |
+| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` or `depth_m`>0 → 3D slab + wall punch. `niche` → POM dip. `volume` → pilaster box |
 
 ---
 

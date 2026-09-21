@@ -42,6 +42,14 @@ json/*.passages.json
 !json/verify.passages.json
 !json/test.passages.json
 !json/test2.passages.json
+!json/style_demo.passages.json
+
+# Demo style pack (S6) — tiny committed preset maps
+!assets/sample_textures/styles/
+!assets/sample_textures/styles/*.json
+!assets/sample_textures/presets/
+!assets/sample_textures/presets/**/
+!assets/sample_textures/presets/**/diffuse.png
 
 # Render and compile output directories
 renders_out/

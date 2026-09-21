@@ -273,7 +273,7 @@ For each Arch:
 4. Set `TransparencyAttrib` per the `transparency` field.
 5. Place as a separate `GeomNode` (not merged) to allow correct depth sorting.
 
-**Openings / niches:** a non-billboard arch with `kind=opening` or `depth_m>0` is a 3D slab (profile `rect`/`round`/`gothic`, wall punch, n-slice skipped). `kind=niche` stays a planar span on the wall for POM. `alpha_blend` and billboard stay cards.
+**Openings / niches / volumes:** a non-billboard arch with `kind=opening` or `depth_m>0` is a 3D slab (profile `rect`/`round`/`gothic`, wall punch, n-slice skipped). `kind=niche` stays a planar span on the wall for POM. `kind=volume` is an additive box extruded into the room. `alpha_blend` and billboard stay cards.
 
 > **Depth sorting:** Panda3D's `NodePath.setTransparency(TransparencyAttrib.MAlpha)` handles back-to-front sorting automatically when nodes are separate.  `TransparencyAttrib.MDual` (two-pass) is the fallback for overlapping arches.
 

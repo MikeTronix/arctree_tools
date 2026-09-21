@@ -5,6 +5,7 @@ from passages_tool.converter.arch_builder import build_arches
 from passages_tool.converter.opening import (
     collect_opening_punches,
     is_3d_opening,
+    is_volume,
     leftover_patches,
     profile_polyline,
     project_opening_onto_edge,
@@ -59,6 +60,17 @@ def test_is_3d_opening_defaults():
     assert is_3d_opening(a) is True
     a.orientation = "billboard"
     assert is_3d_opening(a) is False
+
+
+def test_is_volume_not_opening():
+    a = Polyline.make_arch((0.0, 0.0))
+    a.orientation = 90.0
+    a.kind = "volume"
+    a.depth_m = 0.5
+    assert is_volume(a) is True
+    assert is_3d_opening(a) is False
+    a.orientation = "billboard"
+    assert is_volume(a) is False
 
 
 def test_project_opening_onto_edge():
@@ -183,6 +195,39 @@ def test_card_arch_unchanged_without_kind(tmp_path):
     level.add_polyline(pl)
     polys = get_egg_polygons(build_arches(level, texture_dir=tmp_path)[0])
     assert len(polys) == 1
+
+
+def test_volume_box_has_five_faces_no_punch(tmp_path):
+    level = Level()
+    level.meta.wall_height = 4.0
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (10.0, 0.0)]
+    from passages_tool.editor.polyline_data import TextureInterval
+    wall.texture_intervals = [TextureInterval(0, 1, "wall.png")]
+    level.add_polyline(wall)
+    vol = Polyline.make_arch((5.0, 0.0))
+    vol.orientation = 90.0
+    vol.width = 0.6
+    vol.kind = "volume"
+    vol.depth_m = 0.5
+    vol.height_override = 4.0
+    vol.texture = "stone.png"
+    level.add_polyline(vol)
+    arch_polys = get_egg_polygons(build_arches(level, texture_dir=tmp_path)[0])
+    assert len(arch_polys) == 5
+    wall_polys = get_egg_polygons(build_wall_strips(level, texture_dir=tmp_path)[0])
+
+    def covers(x, z):
+        for poly in wall_polys:
+            verts = get_polygon_vertices(poly)
+            xs = [v["pos"][0] for v in verts]
+            zs = [v["pos"][2] for v in verts]
+            if min(xs) - 0.05 <= x <= max(xs) + 0.05 and min(zs) - 0.05 <= z <= max(zs) + 0.05:
+                return True
+        return False
+
+    assert covers(5.0, 1.0)
+    assert collect_opening_punches(level) == {}
 
 
 def test_billboard_ignores_depth(tmp_path):

@@ -15,6 +15,16 @@ _PUNCH_DIST_M = 0.25
 _MIN_SPAN = 0.02
 
 
+def is_volume(pl) -> bool:
+    """True when this arch is an additive box/pillar (wall stays intact)."""
+    if getattr(pl, "type", None) != PolylineType.ARCH:
+        return False
+    if getattr(pl, "orientation", None) == "billboard":
+        return False
+    kind = getattr(pl, "kind", None) or None
+    return kind == "volume"
+
+
 def is_niche(pl) -> bool:
     """True when this arch is a POM recess (wall stays intact)."""
     if getattr(pl, "type", None) != PolylineType.ARCH:
