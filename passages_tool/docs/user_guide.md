@@ -212,7 +212,7 @@ Names are paths relative to the folder (`base/brick.png` if nested). Folders nam
 
 A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Set `"style": "<id>"` on the level `meta` (no picker yet). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
 
-On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` leaves the wall and bakes a POM recess (needs the style); `"kind": "volume"` is an additive pilaster box. Overlay densities > 0 stamp wetness/moss/graffiti (seeded; 0 = unchanged bands). Demo: `json/style_demo.passages.json` with `styles/crypt_ashlar.json`.
+On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` POM dip (needs style); `"kind": "volume"` pilaster into the room; `"kind": "recess"` walk-in box into the wall (punches). Style `"loop_u"` continues tiling around corners (default true). `"ceiling": { "mode": "none" }` or `meta.ceiling_mode` skips the roof; `"beams"` hang under the ceiling. Demo: `json/style_demo.passages.json`.
 
 Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`.
 
@@ -324,7 +324,8 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
 | Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
 | EyePath `edges` | Directed `[from, to]` pairs |
-| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` or `depth_m`>0 → 3D slab + wall punch. `niche` → POM dip. `volume` → pilaster box |
+| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` / `recess` punch; `niche` POM; `volume` pilaster |
+| `meta.ceiling_mode` | Optional `closed` \| `none` (no roof) |
 
 ---
 

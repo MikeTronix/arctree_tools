@@ -197,11 +197,91 @@ def build_floor(level: Level, texture_dir: Optional[Path] = None) -> EggGroup:
     return group
 
 
+def _try_style_pack(level: Level, texture_dir: Optional[Path]):
+    if not level.meta.style or texture_dir is None:
+        return None
+    try:
+        from passages_tool.textures.style import StyleError, load_level_style
+
+        return load_level_style(Path(texture_dir), level.meta.style)
+    except Exception:
+        return None
+
+
+def ceiling_mode_for(level: Level, pack=None) -> str:
+    if getattr(level.meta, "ceiling_mode", None) in ("none", "closed"):
+        return str(level.meta.ceiling_mode)
+    if pack is not None and pack.ceiling is not None and pack.ceiling.mode == "none":
+        return "none"
+    return "closed"
+
+
+def _add_ceiling_beams(group, ctx, level: Level, pack, texture_dir: Optional[Path]) -> None:
+    """Boxes under the ceiling, spaced along the short AABB axis of each room."""
+    beams = pack.ceiling.beams if pack.ceiling else None
+    if beams is None:
+        return
+    tex_name = None
+    if beams.preset:
+        tex_name = f"presets/{beams.preset}/diffuse.png"
+    elif pack.default_opening.side_preset:
+        tex_name = f"presets/{pack.default_opening.side_preset}/diffuse.png"
+    elif level.meta.ceiling_texture:
+        tex_name = level.meta.ceiling_texture
+    egg_tex = ctx.get_or_create_texture(tex_name) if tex_name else None
+    z_top = float(level.meta.wall_height)
+    z_bot = z_top - float(beams.depth_m)
+    hw = float(beams.width_m) * 0.5
+    closed_walls = [pl for pl in level.polylines.values() if _is_wall_closed(pl)]
+    for pl in closed_walls:
+        loop = _loop_vertices(pl)
+        xs = [p[0] for p in loop]
+        ys = [p[1] for p in loop]
+        minx, maxx, miny, maxy = min(xs), max(xs), min(ys), max(ys)
+        dx, dy = maxx - minx, maxy - miny
+        if dx < 1e-3 or dy < 1e-3:
+            continue
+        along_x = dx >= dy
+        span0, span1 = (minx, maxx) if along_x else (miny, maxy)
+        space0, space1 = (miny, maxy) if along_x else (minx, maxx)
+        t = space0 + beams.spacing_m * 0.5
+        while t < space1 - 1e-6:
+            lo, hi = t - hw, t + hw
+            if along_x:
+                x0, x1, y0, y1 = span0, span1, lo, hi
+            else:
+                x0, x1, y0, y1 = lo, hi, span0, span1
+            # Bottom face (visible from below)
+            bl = ctx.add_vertex(x0, y0, z_bot, 0.0, 0.0, (0.0, 0.0, -1.0))
+            br = ctx.add_vertex(x1, y0, z_bot, 1.0, 0.0, (0.0, 0.0, -1.0))
+            tr = ctx.add_vertex(x1, y1, z_bot, 1.0, 1.0, (0.0, 0.0, -1.0))
+            tl = ctx.add_vertex(x0, y1, z_bot, 0.0, 1.0, (0.0, 0.0, -1.0))
+            group.add_child(ctx.add_polygon([bl, br, tr, tl], egg_tex))
+            # Four sides
+            sides = (
+                ((x0, y0, z_bot), (x1, y0, z_bot), (x1, y0, z_top), (x0, y0, z_top), (0.0, -1.0, 0.0)),
+                ((x1, y0, z_bot), (x1, y1, z_bot), (x1, y1, z_top), (x1, y0, z_top), (1.0, 0.0, 0.0)),
+                ((x1, y1, z_bot), (x0, y1, z_bot), (x0, y1, z_top), (x1, y1, z_top), (0.0, 1.0, 0.0)),
+                ((x0, y1, z_bot), (x0, y0, z_bot), (x0, y0, z_top), (x0, y1, z_top), (-1.0, 0.0, 0.0)),
+            )
+            for a, b, c, d, n in sides:
+                va = ctx.add_vertex(a[0], a[1], a[2], 0.0, 0.0, n)
+                vb = ctx.add_vertex(b[0], b[1], b[2], 1.0, 0.0, n)
+                vc = ctx.add_vertex(c[0], c[1], c[2], 1.0, 1.0, n)
+                vd = ctx.add_vertex(d[0], d[1], d[2], 0.0, 1.0, n)
+                group.add_child(ctx.add_polygon([va, vb, vc, vd], egg_tex))
+            t += beams.spacing_m
+
+
 def build_ceiling(level: Level, texture_dir: Optional[Path] = None) -> EggGroup:
     """Build the triangulated ceiling geometry group."""
     group = EggGroup("ceiling")
     ctx = EggContext("ceiling")
     group.add_child(ctx.vpool)
+
+    pack = _try_style_pack(level, texture_dir)
+    if ceiling_mode_for(level, pack) == "none":
+        return group
 
     tex_name = level.meta.ceiling_texture
     tex_w, tex_h = get_texture_size(tex_name, texture_dir)
@@ -213,5 +293,8 @@ def build_ceiling(level: Level, texture_dir: Optional[Path] = None) -> EggGroup:
     )
     for poly in polys:
         group.add_child(poly)
+
+    if pack is not None:
+        _add_ceiling_beams(group, ctx, level, pack, texture_dir)
 
     return group

@@ -15,6 +15,16 @@ _PUNCH_DIST_M = 0.25
 _MIN_SPAN = 0.02
 
 
+def is_recess(pl) -> bool:
+    """True when this arch is a 3D walk-in recess (punches, has a back wall)."""
+    if getattr(pl, "type", None) != PolylineType.ARCH:
+        return False
+    if getattr(pl, "orientation", None) == "billboard":
+        return False
+    kind = getattr(pl, "kind", None) or None
+    return kind == "recess"
+
+
 def is_volume(pl) -> bool:
     """True when this arch is an additive box/pillar (wall stays intact)."""
     if getattr(pl, "type", None) != PolylineType.ARCH:
@@ -44,7 +54,7 @@ def is_3d_opening(pl) -> bool:
     if getattr(pl, "transparency", "") == "alpha_blend":
         return False
     kind = getattr(pl, "kind", None) or None
-    if kind in ("niche", "volume"):
+    if kind in ("niche", "volume", "recess"):
         return False
     depth = getattr(pl, "depth_m", None)
     if kind == "opening":
@@ -235,8 +245,10 @@ def _collect_arch_holes(level: Level, predicate) -> dict[tuple[str, int], list[W
 
 
 def collect_opening_punches(level: Level) -> dict[tuple[str, int], list[WallHole]]:
-    """Map ``(wall_id, edge_start_vertex)`` → 3D-opening holes."""
-    return _collect_arch_holes(level, is_3d_opening)
+    """Map ``(wall_id, edge_start_vertex)`` → 3D-opening and recess holes."""
+    return _collect_arch_holes(
+        level, lambda pl: is_3d_opening(pl) or is_recess(pl)
+    )
 
 
 def collect_niche_spans(level: Level) -> dict[tuple[str, int], list[WallHole]]:

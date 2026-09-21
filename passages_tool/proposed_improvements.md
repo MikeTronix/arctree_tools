@@ -26,7 +26,7 @@ Status: **done** · **partial** · **open**
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | 11 and 12 done; remaining items unscheduled |
 
-Tests at last S6 commit: **249 passed** (1 gpu skipped).
+Tests at last S7 commit: **255 passed** (1 gpu skipped).
 
 ---
 
@@ -319,7 +319,7 @@ Slider grouping is done via `_hist` coalesce. Command-pattern history is only ne
 10. Drop tkinter file dialogs.
 11. **Turn slew from a per-node yaw strip (client + baker).** **done (compat).** Baker writes extra `yaw_vXXXX.png` (four 90° faces, ~341px tall at default 576). Manifest `eyepoints.*.yaw_strip` is **optional** — omitted on old bakes. Client pans a `fov_h` window (80–400 ms by |Δyaw|) then lands on the hi-res still; if the key or file is missing, the still-to-still crossfade is unchanged. `--no-yaw-strip` skips extras. Do not replace sharp viewpoints with the strip.
 12. **Adjustable / HiDPI UI scale (editor).** **done.** View → UI Scale is 100/125/150/200%. Persisted as `ui_scale` in `editor_state.json`. First launch (no saved key) snaps Windows DPI/96 to the nearest preset. imgui-bundle 1.92: `style.font_scale_main` + relative `style.scale_all_sizes`. Side panels, vertex fields, and thumbnails grow; viewport world units, grid, and handle radii do not.
-13. **Style dressing (bands / interruptions / overlays).** **S1–S6 done.** Bands, overlays, 3D openings, POM niches, volume boxes, demo `crypt_ashlar` pack. Remaining: S7 optional. `design_docs/passages_style_dressing_20SEP26.md`.
+13. **Style dressing (bands / interruptions / overlays).** **S1–S7 done.** `design_docs/passages_style_dressing_20SEP26.md`.
 
 Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into a content editor.
 
@@ -333,7 +333,7 @@ P2 architecture (including 5.5 EggContext texture parenting) is done. **4.1** mu
 
 **Style dressing** (`design_docs/passages_style_dressing_20SEP26.md`) is the primary dressing plan: environment **bands**, clicked **interruptions** (3D opening slabs vs POM niches), seeded **overlays**. The older index-map + 8-slot GPU plan (`passages_pom_metatexture_14SEP26.md`) is **superseded as authoring interchange**. Keep Phase 0 (custom GLSL offscreen **passed**), UV-in-meters, unique-map compose, and silhouette POM. Do not start old P1 (R-codes / arrays) unless a painted override mask is needed later.
 
-**S1–S6** done. `kind=volume` is an additive pilaster box. Demo pack: `assets/sample_textures/styles/crypt_ashlar.json` + `json/style_demo.passages.json`. Next: **S7** optional (loop-continuous U, walk-in recess, ceiling beams, no-roof).
+**S1–S7** done. Style dressing v1 is complete: bands, overlays, openings, niches, volumes, loop-U, recesses, ceiling beams, no-roof. Next is authoring UX (kind combo / style picker) if wanted — not a bake leftover.
 
 ---
 

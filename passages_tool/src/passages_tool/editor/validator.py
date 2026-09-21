@@ -113,7 +113,8 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
             target_id="",
             message="Floor has no texture assigned (Level Properties > floor) — it will render transparent.",
         ))
-    if not level.meta.ceiling_texture:
+    skip_ceiling = getattr(level.meta, "ceiling_mode", None) == "none"
+    if not skip_ceiling and not level.meta.ceiling_texture:
         warnings.append(ValidationWarning(
             kind="missing_ceiling",
             target_id="",

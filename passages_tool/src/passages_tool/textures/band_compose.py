@@ -84,6 +84,7 @@ def compose_edge_diffuse(
     wall_id: str = "",
     edge_idx: int = 0,
     overlay_seed: Optional[int] = None,
+    u0_m: float = 0.0,
 ) -> Optional[Image.Image]:
     """Rasterize one wall edge. None if U would exceed COMPOSE_U_MAX."""
     if length_m <= 1e-6 or height_m <= 1e-6 or ppm <= 1e-6:
@@ -117,7 +118,7 @@ def compose_edge_diffuse(
         for x in range(w):
             if src is None:
                 continue
-            s_m = (x + 0.5) / ppm
+            s_m = (x + 0.5) / ppm + float(u0_m)
             pix[x, y] = sample_wrap(src, s_m / tile_u, z_m / tile_v)
     from passages_tool.textures.overlays import apply_overlays
 
@@ -154,6 +155,7 @@ def write_edge_diffuse(
     preset_images: Optional[dict[str, Image.Image]] = None,
     overlay_seed: Optional[int] = None,
     niches=None,
+    u0_m: float = 0.0,
 ) -> Optional[str]:
     """Write the unique map under ``texture_dir/_style_cache/``. Relative posix path."""
     img = compose_edge_diffuse(
@@ -166,6 +168,7 @@ def write_edge_diffuse(
         wall_id=wall_id,
         edge_idx=edge_idx,
         overlay_seed=overlay_seed,
+        u0_m=u0_m,
     )
     if img is None:
         return None

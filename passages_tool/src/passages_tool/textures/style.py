@@ -56,6 +56,22 @@ class StyleSurface:
 
 
 @dataclass(frozen=True)
+class StyleBeams:
+    spacing_m: float = 2.0
+    width_m: float = 0.2
+    depth_m: float = 0.15
+    preset: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class StyleCeiling:
+    preset: Optional[str] = None
+    tile_meters: Optional[tuple[float, float]] = None
+    mode: str = "closed"
+    beams: Optional[StyleBeams] = None
+
+
+@dataclass(frozen=True)
 class StylePack:
     version: int
     id: str
@@ -65,8 +81,9 @@ class StylePack:
     default_opening: StyleOpeningDefaults
     niche: StyleNiche
     overlays: StyleOverlays
-    ceiling: Optional[StyleSurface] = None
+    ceiling: Optional[StyleCeiling] = None
     floor: Optional[StyleSurface] = None
+    loop_u: bool = True
     path: Optional[Path] = None
 
     def preset_ids(self) -> tuple[str, ...]:
@@ -75,8 +92,10 @@ class StylePack:
             ids.append(b.preset)
         if self.default_opening.side_preset:
             ids.append(self.default_opening.side_preset)
-        if self.ceiling:
+        if self.ceiling and self.ceiling.preset:
             ids.append(self.ceiling.preset)
+        if self.ceiling and self.ceiling.beams and self.ceiling.beams.preset:
+            ids.append(self.ceiling.beams.preset)
         if self.floor:
             ids.append(self.floor.preset)
         # unique, stable order
@@ -156,6 +175,44 @@ def _parse_band(raw: Any, index: int) -> StyleBand:
         tile_meters=_pair_meters(raw.get("tile_meters"), field=f"bands[{index}].tile_meters"),
         pom=bool(raw.get("pom", False)),
         height_scale_m=float(hsm) if hsm is not None else None,
+    )
+
+
+def _parse_beams(raw: Any) -> Optional[StyleBeams]:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise StyleError("ceiling.beams must be an object")
+    spacing = float(raw.get("spacing_m", 2.0))
+    width = float(raw.get("width_m", 0.2))
+    depth = float(raw.get("depth_m", 0.15))
+    if spacing <= 0.0 or width <= 0.0 or depth <= 0.0:
+        raise StyleError("ceiling.beams spacing_m/width_m/depth_m must be > 0")
+    preset = raw.get("preset")
+    return StyleBeams(
+        spacing_m=spacing,
+        width_m=width,
+        depth_m=depth,
+        preset=(str(preset).strip() or None) if preset is not None else None,
+    )
+
+
+def _parse_ceiling(raw: Any) -> Optional[StyleCeiling]:
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise StyleError("ceiling must be an object")
+    mode = str(raw.get("mode") or "closed").strip()
+    if mode not in ("closed", "none"):
+        raise StyleError("ceiling.mode must be 'closed' or 'none'")
+    preset = str(raw.get("preset") or "").strip() or None
+    return StyleCeiling(
+        preset=preset,
+        tile_meters=_pair_meters(raw.get("tile_meters"), field="ceiling.tile_meters")
+        if raw.get("tile_meters") is not None
+        else None,
+        mode=mode,
+        beams=_parse_beams(raw.get("beams")),
     )
 
 
@@ -256,8 +313,9 @@ def load_style(path: Path) -> StylePack:
         default_opening=opening,
         niche=niche,
         overlays=overlays,
-        ceiling=_parse_surface(data.get("ceiling"), "ceiling"),
+        ceiling=_parse_ceiling(data.get("ceiling")),
         floor=_parse_surface(data.get("floor"), "floor"),
+        loop_u=bool(data.get("loop_u", True)),
         path=p,
     )
 

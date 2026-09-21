@@ -17,7 +17,7 @@ A standalone Python + Panda3D application for designing, compiling, and baking 2
 - **Shipping Transcoder** — Pillow and Basis Universal-based packaging script that compiles renders to `.ktx2` formats (with JPEG fallbacks) and alerts on any transparency anomalies before deployment.
 - **Undo / Redo** — Robust history snapshot stack (`Ctrl+Z` / `Ctrl+Y`).
 - **HiDPI / UI scale** — View → UI Scale (100/125/150/200%) enlarges ImGui chrome and vertex fields. Viewport world units are unchanged. Stored in `editor_state.json`; first launch follows Windows DPI.
-- **Style packs (optional)** — `meta.style` plus `styles/<id>.json` and `presets/<name>/diffuse.png` composite wall bands in **meters**. Interval PNGs remain overrides. Seeded overlay stamps; `kind=opening` punches a 3D slab; `kind=niche` is bake-time POM; `kind=volume` is a pilaster box. Demo: `json/style_demo.passages.json`. See `writer_docs/passages_style_preparation_20SEP26.md`.
+- **Style packs (optional)** — bands in meters, overlays, `opening`/`niche`/`volume`/`recess`, loop-U, ceiling beams, `ceiling_mode: none`. Demo: `json/style_demo.passages.json`. See `writer_docs/passages_style_preparation_20SEP26.md`.
 
 ---
 

@@ -42,8 +42,16 @@
     "preset": "crypt_floor",
     "tile_meters": [2.0, 2.0]
   },
+  "loop_u": true,
   "ceiling": {
     "preset": "crypt_ceiling",
-    "tile_meters": [2.0, 2.0]
+    "tile_meters": [2.0, 2.0],
+    "mode": "closed",
+    "beams": {
+      "spacing_m": 2.0,
+      "width_m": 0.18,
+      "depth_m": 0.12,
+      "preset": "stone_ashlar"
+    }
   }
 }

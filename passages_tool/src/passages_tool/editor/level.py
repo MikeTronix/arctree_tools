@@ -142,6 +142,8 @@ class LevelMeta:
     style: Optional[str] = None
     overlay_seed: Optional[int] = None
     pom_enabled: bool = False
+    # S7: "closed" (default) or "none" (no ceiling fill). None = follow style.
+    ceiling_mode: Optional[str] = None
 
 
 
@@ -464,6 +466,8 @@ class Level:
             meta["overlay_seed"] = int(m.overlay_seed)
         if m.pom_enabled:
             meta["pom_enabled"] = True
+        if m.ceiling_mode:
+            meta["ceiling_mode"] = m.ceiling_mode
         return {
             "version": 2,
             "meta": meta,
@@ -511,6 +515,11 @@ class Level:
             except (TypeError, ValueError):
                 m.overlay_seed = None
         m.pom_enabled = bool(meta.get("pom_enabled", False))
+        raw_cm = meta.get("ceiling_mode")
+        if isinstance(raw_cm, str) and raw_cm.strip() in ("closed", "none"):
+            m.ceiling_mode = raw_cm.strip()
+        else:
+            m.ceiling_mode = None
         # fov_h is derived from fov_v + render aspect; ignore any stored value.
         level.sync_derived_fov_h()
 

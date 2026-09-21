@@ -33,7 +33,7 @@ def _solid_preset(path, rgb) -> None:
     Image.new("RGB", (16, 16), rgb).save(path, "PNG")
 
 
-def _write_pack(root, *, tile=(2.0, 2.0), bands=None) -> None:
+def _write_pack(root, *, tile=(2.0, 2.0), bands=None, extra=None) -> None:
     styles = root / "styles"
     styles.mkdir(parents=True, exist_ok=True)
     data = {
@@ -48,6 +48,8 @@ def _write_pack(root, *, tile=(2.0, 2.0), bands=None) -> None:
         "opening_profiles": ["rect"],
         "default_opening": {"profile": "rect", "depth_m": 0.4},
     }
+    if extra:
+        data.update(extra)
     (styles / "crypt_ashlar.json").write_text(json.dumps(data), encoding="utf-8")
 
 

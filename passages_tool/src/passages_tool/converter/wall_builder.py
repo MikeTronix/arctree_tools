@@ -220,6 +220,8 @@ def _build_styled_wall(
     n_verts = len(pl.vertices)
     override_edges: set[int] = set()
     has_polys = False
+    u_acc = 0.0
+    loop_u = bool(getattr(pack, "loop_u", True))
     for iv in pl.texture_intervals:
         if not iv.texture:
             continue
@@ -254,6 +256,7 @@ def _build_styled_wall(
                 preset_images=preset_images,
                 overlay_seed=overlay_seed,
                 niches=(niches.get((pl.id, v_from), []) if niches else []),
+                u0_m=(u_acc if loop_u else 0.0),
             )
         egg_tex = ctx.get_or_create_texture(rel) if rel else None
         holes = []
@@ -263,6 +266,8 @@ def _build_styled_wall(
             ctx, group, x1, y1, x2, y2, segment_len, wall_height, nx, ny,
             holes, egg_tex, unique_uv=True,
         ) or has_polys
+        if loop_u:
+            u_acc += segment_len
     return has_polys
 
 
