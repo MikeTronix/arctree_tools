@@ -21,6 +21,11 @@ from passages_tool.editor.level import (
     interval_edge_indices,
     wall_edge_index_pairs,
 )
+from passages_tool.converter.opening import (
+    WallHole,
+    collect_opening_punches,
+    leftover_patches,
+)
 from passages_tool.textures.style import StyleError, StylePack, load_level_style
 
 
@@ -56,20 +61,73 @@ def _emit_quad(
     y1: float,
     x2: float,
     y2: float,
-    wall_height: float,
+    z0: float,
+    z1: float,
     nx: float,
     ny: float,
     u_start: float,
     u_end: float,
-    v_top: float,
+    v0: float,
+    v1: float,
     egg_tex,
 ) -> None:
     nz = 0.0
-    bl = ctx.add_vertex(x1, y1, 0.0, u_start, 0.0, (nx, ny, nz))
-    br = ctx.add_vertex(x2, y2, 0.0, u_end, 0.0, (nx, ny, nz))
-    tr = ctx.add_vertex(x2, y2, wall_height, u_end, v_top, (nx, ny, nz))
-    tl = ctx.add_vertex(x1, y1, wall_height, u_start, v_top, (nx, ny, nz))
+    bl = ctx.add_vertex(x1, y1, z0, u_start, v0, (nx, ny, nz))
+    br = ctx.add_vertex(x2, y2, z0, u_end, v0, (nx, ny, nz))
+    tr = ctx.add_vertex(x2, y2, z1, u_end, v1, (nx, ny, nz))
+    tl = ctx.add_vertex(x1, y1, z1, u_start, v1, (nx, ny, nz))
     group.add_child(ctx.add_polygon([bl, br, tr, tl], egg_tex))
+
+
+def _emit_edge_patches(
+    ctx: EggContext,
+    group: EggGroup,
+    ax: float,
+    ay: float,
+    bx: float,
+    by: float,
+    length_m: float,
+    wall_height: float,
+    nx: float,
+    ny: float,
+    holes: list[WallHole],
+    egg_tex,
+    *,
+    unique_uv: bool,
+    accum_m: float = 0.0,
+    x_offset: float = 0.0,
+    ppm: float = 256.0,
+    tex_w: float = 512.0,
+    tex_h: float = 512.0,
+) -> bool:
+    if length_m < 1e-6:
+        return False
+    patches = leftover_patches(length_m, wall_height, holes)
+    if not patches:
+        return False
+    dx, dy = bx - ax, by - ay
+    emitted = False
+    for p in patches:
+        t0, t1 = p.s0 / length_m, p.s1 / length_m
+        x1 = ax + t0 * dx
+        y1 = ay + t0 * dy
+        x2 = ax + t1 * dx
+        y2 = ay + t1 * dy
+        if unique_uv:
+            u0, u1 = t0, t1
+            v0 = p.z0 / wall_height if wall_height > 1e-6 else 0.0
+            v1 = p.z1 / wall_height if wall_height > 1e-6 else 1.0
+        else:
+            u0 = ((accum_m + p.s0) * ppm + x_offset) / tex_w
+            u1 = ((accum_m + p.s1) * ppm + x_offset) / tex_w
+            v0 = (p.z0 * ppm) / tex_h
+            v1 = (p.z1 * ppm) / tex_h
+        _emit_quad(
+            ctx, group, x1, y1, x2, y2, p.z0, p.z1, nx, ny,
+            u0, u1, v0, v1, egg_tex,
+        )
+        emitted = True
+    return emitted
 
 
 def build_wall_strips(
@@ -88,6 +146,7 @@ def build_wall_strips(
     ppm = level.meta.pixels_per_meter
     pack = _try_style_pack(level, texture_dir)
     preset_images: dict = {}
+    punches = collect_opening_punches(level)
 
     for pl in level.polylines.values():
         if pl.type != PolylineType.WALL or len(pl.vertices) < 2:
@@ -102,10 +161,12 @@ def build_wall_strips(
             has_polys = _build_styled_wall(
                 pl, group, ctx, pack, texture_dir, wall_height, ppm, preset_images,
                 overlay_seed=level.meta.overlay_seed,
+                punches=punches,
             )
         else:
             has_polys = _build_interval_wall(
-                pl, group, ctx, n_verts, texture_dir, wall_height, ppm
+                pl, group, ctx, n_verts, texture_dir, wall_height, ppm,
+                punches=punches,
             )
 
         if has_polys:
@@ -122,6 +183,7 @@ def _build_interval_wall(
     texture_dir: Optional[Path],
     wall_height: float,
     ppm: float,
+    punches: Optional[dict] = None,
 ) -> bool:
     intervals = pl.texture_intervals
     if not intervals:
@@ -131,7 +193,8 @@ def _build_interval_wall(
     has_polys = False
     for iv in intervals:
         has_polys = _emit_interval_edges(
-            pl, group, ctx, iv, n_verts, texture_dir, wall_height, ppm
+            pl, group, ctx, iv, n_verts, texture_dir, wall_height, ppm,
+            punches=punches,
         ) or has_polys
     return has_polys
 
@@ -146,6 +209,7 @@ def _build_styled_wall(
     ppm: float,
     preset_images: dict,
     overlay_seed: Optional[int] = None,
+    punches: Optional[dict] = None,
 ) -> bool:
     from passages_tool.textures.band_compose import write_edge_diffuse
 
@@ -157,7 +221,8 @@ def _build_styled_wall(
             continue
         override_edges.update(interval_edge_indices(pl, iv))
         has_polys = _emit_interval_edges(
-            pl, group, ctx, iv, n_verts, texture_dir, wall_height, ppm
+            pl, group, ctx, iv, n_verts, texture_dir, wall_height, ppm,
+            punches=punches,
         ) or has_polys
 
     for v_from, v_to in wall_edge_index_pairs(pl):
@@ -186,11 +251,13 @@ def _build_styled_wall(
                 overlay_seed=overlay_seed,
             )
         egg_tex = ctx.get_or_create_texture(rel) if rel else None
-        _emit_quad(
-            ctx, group, x1, y1, x2, y2, wall_height, nx, ny,
-            0.0, 1.0, 1.0, egg_tex,
-        )
-        has_polys = True
+        holes = []
+        if punches:
+            holes = punches.get((pl.id, v_from), [])
+        has_polys = _emit_edge_patches(
+            ctx, group, x1, y1, x2, y2, segment_len, wall_height, nx, ny,
+            holes, egg_tex, unique_uv=True,
+        ) or has_polys
     return has_polys
 
 
@@ -203,6 +270,7 @@ def _emit_interval_edges(
     texture_dir: Optional[Path],
     wall_height: float,
     ppm: float,
+    punches: Optional[dict] = None,
 ) -> bool:
     tex_w, tex_h = get_texture_size(iv.texture, texture_dir)
     egg_tex = ctx.get_or_create_texture(iv.texture) if iv.texture else None
@@ -224,13 +292,13 @@ def _emit_interval_edges(
         if segment_len < 1e-6:
             continue
         nx, ny = dy / segment_len, -dx / segment_len
-        u_start = (accumulated_len * ppm + iv.x_offset) / tex_w
-        u_end = ((accumulated_len + segment_len) * ppm + iv.x_offset) / tex_w
-        v_top = (wall_height * ppm) / tex_h
-        _emit_quad(
-            ctx, group, x1, y1, x2, y2, wall_height, nx, ny,
-            u_start, u_end, v_top, egg_tex,
-        )
-        has_polys = True
+        holes = []
+        if punches:
+            holes = punches.get((pl.id, v_from), [])
+        has_polys = _emit_edge_patches(
+            ctx, group, x1, y1, x2, y2, segment_len, wall_height, nx, ny,
+            holes, egg_tex, unique_uv=False, accum_m=accumulated_len,
+            x_offset=iv.x_offset, ppm=ppm, tex_w=float(tex_w), tex_h=float(tex_h),
+        ) or has_polys
         accumulated_len += segment_len
     return has_polys

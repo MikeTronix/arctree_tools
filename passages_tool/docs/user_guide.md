@@ -228,7 +228,7 @@ Closed flag; texture intervals (assign, x-offset, split, remove, add); vertex li
 
 ### Arch
 
-Position; billboard vs angle; auto-snap to walls; width / height override; texture; transparency (`none` / `alpha_test` / `alpha_blend`); z-offset; v-at-floor; optional point light.
+Position; billboard vs angle; auto-snap to walls; width / height override; texture; transparency (`none` / `alpha_test` / `alpha_blend`); z-offset; v-at-floor; optional point light. Optional JSON: `kind` (`opening`), `profile` (`rect`/`round`/`gothic`), `depth_m`, `side_texture` — 3D slab that punches the wall (billboard stays a card).
 
 ### EyePath
 
@@ -320,6 +320,7 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
 | Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
 | EyePath `edges` | Directed `[from, to]` pairs |
+| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` or `depth_m`>0 → 3D slab + wall punch |
 
 ---
 

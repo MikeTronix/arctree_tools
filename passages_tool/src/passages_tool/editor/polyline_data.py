@@ -117,6 +117,11 @@ class Arch:
     warning: bool = False
     auto_snap: bool = False
     target_walls: list[str] = field(default_factory=list)
+    # S4 3D opening (omit on save when unset). kind=opening or depth_m>0.
+    kind: Optional[str] = None
+    profile: Optional[str] = None
+    depth_m: Optional[float] = None
+    side_texture: Optional[str] = None
 
     @property
     def type(self) -> PolylineType:
@@ -135,7 +140,7 @@ class Arch:
 
     def to_dict(self) -> dict:
         pos = self.vertices[0] if self.vertices else (0.0, 0.0)
-        return {
+        d = {
             "id": self.id,
             "type": self.type.value,
             "position": list(pos),
@@ -153,6 +158,15 @@ class Arch:
             "auto_snap": self.auto_snap,
             "target_walls": list(self.target_walls),
         }
+        if self.kind:
+            d["kind"] = self.kind
+        if self.profile:
+            d["profile"] = self.profile
+        if self.depth_m is not None:
+            d["depth_m"] = float(self.depth_m)
+        if self.side_texture:
+            d["side_texture"] = self.side_texture
+        return d
 
 
 @dataclass
@@ -281,6 +295,10 @@ def polyline_from_dict(pd: dict) -> AnyPolyline:
             warning=bool(pd.get("warning", False)),
             auto_snap=bool(pd.get("auto_snap", False)),
             target_walls=list(pd.get("target_walls", [])),
+            kind=pd.get("kind"),
+            profile=pd.get("profile"),
+            depth_m=(float(pd["depth_m"]) if pd.get("depth_m") is not None else None),
+            side_texture=pd.get("side_texture"),
         )
 
     if pl_type == PolylineType.EYEPATH:

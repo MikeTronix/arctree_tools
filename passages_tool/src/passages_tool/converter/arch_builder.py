@@ -13,8 +13,15 @@ from typing import Optional
 from panda3d.egg import EggGroup, EggTexture
 
 from passages_tool.converter.egg_writer import EggContext
+from passages_tool.converter.opening import (
+    is_3d_opening,
+    opening_depth_m,
+    opening_profile_name,
+    profile_polyline,
+)
 from passages_tool.converter.wall_builder import get_texture_size
 from passages_tool.editor.level import Level, Polyline, PolylineType
+from passages_tool.textures.style import StyleError, load_level_style
 
 
 def load_arch_config(texture_name: Optional[str], texture_dir: Optional[Path]) -> Optional[dict]:
@@ -123,6 +130,100 @@ def find_snap_points(
     return best_p_left, best_p_right, width, (nx, ny), midpoint
 
 
+def _world_on_span(p_left, p_right, width, nx, ny, s, z, along):
+    t = s / width if width > 1e-9 else 0.0
+    x = p_left[0] + t * (p_right[0] - p_left[0]) + along * nx
+    y = p_left[1] + t * (p_right[1] - p_left[1]) + along * ny
+    return x, y, z
+
+
+def _add_quad(ctx, group, pts, tex, normal):
+    verts = []
+    uvs = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
+    for (x, y, z), (u, v) in zip(pts, uvs):
+        verts.append(ctx.add_vertex(x, y, z, u, v, normal))
+    poly = ctx.add_polygon(verts, tex)
+    group.add_child(poly)
+    return poly
+
+
+def _build_opening_slab(
+    group: EggGroup,
+    ctx: EggContext,
+    p_left,
+    p_right,
+    width: float,
+    nx: float,
+    ny: float,
+    z_bottom: float,
+    z_top: float,
+    depth: float,
+    profile: str,
+    front_tex,
+    side_tex,
+) -> None:
+    """Flush-front slab: tunnel along the profile, front/back cards, spandrels."""
+    height = z_top - z_bottom
+    depth = max(0.05, float(depth))
+    pts = profile_polyline(profile, width, z_bottom, height)
+    n_in = (-nx, -ny, 0.0)
+    n_out = (nx, ny, 0.0)
+    # Inner tunnel (into the wall = -normal)
+    nseg = len(pts)
+    for i in range(nseg):
+        s0, z0 = pts[i]
+        s1, z1 = pts[(i + 1) % nseg]
+        f0 = _world_on_span(p_left, p_right, width, nx, ny, s0, z0, 0.0)
+        f1 = _world_on_span(p_left, p_right, width, nx, ny, s1, z1, 0.0)
+        b0 = _world_on_span(p_left, p_right, width, nx, ny, s0, z0, -depth)
+        b1 = _world_on_span(p_left, p_right, width, nx, ny, s1, z1, -depth)
+        _add_quad(ctx, group, (f0, f1, b1, b0), side_tex, n_in)
+    # Front / back decorative cards (bounding rect)
+    fl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_bottom, 0.0)
+    fr = _world_on_span(p_left, p_right, width, nx, ny, width, z_bottom, 0.0)
+    ftr = _world_on_span(p_left, p_right, width, nx, ny, width, z_top, 0.0)
+    ftl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_top, 0.0)
+    poly_f = _add_quad(ctx, group, (fl, fr, ftr, ftl), front_tex, n_out)
+    poly_f.set_bface_flag(True)
+    bl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_bottom, -depth)
+    br = _world_on_span(p_left, p_right, width, nx, ny, width, z_bottom, -depth)
+    btr = _world_on_span(p_left, p_right, width, nx, ny, width, z_top, -depth)
+    btl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_top, -depth)
+    poly_b = _add_quad(ctx, group, (br, bl, btl, btr), front_tex, n_in)
+    poly_b.set_bface_flag(True)
+    if profile in ("round", "gothic"):
+        # Spandrels: corner (0, z_top) / (width, z_top) to the upper profile.
+        upper_z = [p[1] for p in pts if p[1] > z_bottom + 1e-4]
+        spring = min(upper_z) if upper_z else z_bottom
+        left_arc = [p for p in pts if p[0] <= width * 0.5 + 1e-6 and p[1] >= spring - 1e-6]
+        right_arc = [p for p in pts if p[0] >= width * 0.5 - 1e-6 and p[1] >= spring - 1e-6]
+        left_arc = sorted(left_arc, key=lambda p: p[1])
+        right_arc = sorted(right_arc, key=lambda p: p[1])
+        corner_l = (0.0, z_top)
+        corner_r = (width, z_top)
+        for along, nrm in ((0.0, n_out), (-depth, n_in)):
+            if len(left_arc) >= 2:
+                c = _world_on_span(p_left, p_right, width, nx, ny, corner_l[0], corner_l[1], along)
+                for j in range(len(left_arc) - 1):
+                    a = _world_on_span(p_left, p_right, width, nx, ny, left_arc[j][0], left_arc[j][1], along)
+                    b = _world_on_span(p_left, p_right, width, nx, ny, left_arc[j + 1][0], left_arc[j + 1][1], along)
+                    tri = [c, a, b] if along == 0.0 else [c, b, a]
+                    v0 = ctx.add_vertex(*tri[0], 0.0, 1.0, nrm)
+                    v1 = ctx.add_vertex(*tri[1], 0.0, 0.0, nrm)
+                    v2 = ctx.add_vertex(*tri[2], 1.0, 0.0, nrm)
+                    group.add_child(ctx.add_polygon([v0, v1, v2], side_tex))
+            if len(right_arc) >= 2:
+                c = _world_on_span(p_left, p_right, width, nx, ny, corner_r[0], corner_r[1], along)
+                for j in range(len(right_arc) - 1):
+                    a = _world_on_span(p_left, p_right, width, nx, ny, right_arc[j][0], right_arc[j][1], along)
+                    b = _world_on_span(p_left, p_right, width, nx, ny, right_arc[j + 1][0], right_arc[j + 1][1], along)
+                    tri = [c, b, a] if along == 0.0 else [c, a, b]
+                    v0 = ctx.add_vertex(*tri[0], 1.0, 1.0, nrm)
+                    v1 = ctx.add_vertex(*tri[1], 1.0, 0.0, nrm)
+                    v2 = ctx.add_vertex(*tri[2], 0.0, 0.0, nrm)
+                    group.add_child(ctx.add_polygon([v0, v1, v2], side_tex))
+
+
 def build_arches(
     level: Level, texture_dir: Optional[Path] = None
 ) -> list[EggGroup]:
@@ -133,6 +234,12 @@ def build_arches(
     groups: list[EggGroup] = []
     wall_height = level.meta.wall_height
     ppm = level.meta.pixels_per_meter
+    pack = None
+    if level.meta.style and texture_dir is not None:
+        try:
+            pack = load_level_style(Path(texture_dir), level.meta.style)
+        except StyleError:
+            pack = None
 
     for pl in level.polylines.values():
         if pl.type != PolylineType.ARCH or not pl.vertices:
@@ -208,7 +315,24 @@ def build_arches(
             v_bottom = 0.0
             v_top = (height * ppm) / tex_h
 
-        # N-slice UV partitioning
+        if is_3d_opening(pl) and not is_billboard and width > 1e-6:
+            depth = opening_depth_m(pl, pack)
+            prof = opening_profile_name(pl, pack)
+            side_name = getattr(pl, "side_texture", None) or None
+            if not side_name and pack and pack.default_opening.side_preset:
+                side_name = f"presets/{pack.default_opening.side_preset}/diffuse.png"
+            if not side_name:
+                side_name = pl.texture
+            side_tex = ctx.get_or_create_texture(side_name) if side_name else egg_tex
+            _build_opening_slab(
+                group, ctx, p_left, p_right, width, nx, ny,
+                z_bottom, z_top, depth, prof, egg_tex, side_tex,
+            )
+            if group.get_first_child() is not None:
+                groups.append(group)
+            continue
+
+        # N-slice UV partitioning (XOR with 3D opening)
         arch_cfg = load_arch_config(pl.texture, texture_dir)
         u_start, u_end = 0.0, 1.0
         
