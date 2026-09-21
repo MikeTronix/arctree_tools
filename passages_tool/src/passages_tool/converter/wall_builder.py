@@ -100,7 +100,8 @@ def build_wall_strips(
 
         if pack is not None:
             has_polys = _build_styled_wall(
-                pl, group, ctx, pack, texture_dir, wall_height, ppm, preset_images
+                pl, group, ctx, pack, texture_dir, wall_height, ppm, preset_images,
+                overlay_seed=level.meta.overlay_seed,
             )
         else:
             has_polys = _build_interval_wall(
@@ -144,6 +145,7 @@ def _build_styled_wall(
     wall_height: float,
     ppm: float,
     preset_images: dict,
+    overlay_seed: Optional[int] = None,
 ) -> bool:
     from passages_tool.textures.band_compose import write_edge_diffuse
 
@@ -181,6 +183,7 @@ def _build_styled_wall(
                 wall_height,
                 ppm,
                 preset_images=preset_images,
+                overlay_seed=overlay_seed,
             )
         egg_tex = ctx.get_or_create_texture(rel) if rel else None
         _emit_quad(

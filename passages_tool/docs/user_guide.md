@@ -210,7 +210,7 @@ Names are paths relative to the folder (`base/brick.png` if nested). Folders nam
 
 A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Set `"style": "<id>"` on the level `meta` (no picker yet). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
 
-Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`.
+Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`. Overlay densities > 0 stamp wetness/moss/graffiti (seeded; 0 = unchanged bands).
 
 ---
 
@@ -312,7 +312,8 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `meta.fov_v`, `render_width`, `render_height` | Authored. `fov_h` is derived and rewritten on load/save |
 | `meta.pixels_per_meter` | Texture scale (legacy `texture_pixel_size` migrates). With a style, this is unique-map resolution (default 256 px/m), not room size |
 | `meta.style` | Optional style id → `styles/<id>.json` under the texture folder |
-| `meta.overlay_seed`, `meta.pom_enabled` | Optional; stored, not applied to stills yet |
+| `meta.overlay_seed` | Optional; overrides style `overlays.seed` for stamps |
+| `meta.pom_enabled` | Optional; stored, POM not in stills yet |
 | `meta.snap_grid` | Editor snap and visual grid |
 | `grid.cell_size` | Serialized leftover; the viewport does not use it |
 | `tiles` | Legacy; ignored on load, not written |

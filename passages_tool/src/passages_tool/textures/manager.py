@@ -65,7 +65,7 @@ class TextureManager:
             if any(part.startswith(".") for part in path.relative_to(self._base_dir).parts):
                 continue
             parts = path.relative_to(self._base_dir).parts
-            if parts and parts[0] in ("presets", "_style_cache", "_meta_cache"):
+            if parts and parts[0] in ("presets", "_style_cache", "_meta_cache", "overlays"):
                 continue
             rel = path.relative_to(self._base_dir).as_posix()
             self._names.append(rel)
