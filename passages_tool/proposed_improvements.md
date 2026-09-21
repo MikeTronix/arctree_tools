@@ -46,7 +46,7 @@ Do not re-derive these; extend them.
 | `Level.sync_derived_fov_h()` | `editor/level.py` | Updates `meta.fov_h` without touching `dirty`. |
 | `History.redo(current_snapshot)` | `editor/history.py` | Pushes current onto `_undos` before popping redo (undo→redo→undo no longer skips). |
 | `validate_structure(level)` | `editor/validator.py` | Extra-EyePath warning. Called from editor Validate together with textures + arch visibility. |
-| `load_style` / `validate_style` | `textures/style.py`, `editor/validator.py` | S1 style pack. `LevelMeta.style` → `styles/<id>.json`. Missing presets warn; no compose. |
+| `load_style` / `validate_style` / `list_style_ids` | `textures/style.py`, `editor/validator.py`, `ui/properties.py` | Style pack load + Validate. Editor scans `styles/*.json` for the Level Properties combo. |
 | `compose_edge_diffuse` / `write_edge_diffuse` | `textures/band_compose.py` | S2 unique wall-edge maps. U = meters along edge, V = world Z. Interval PNG override. |
 | `apply_overlays` | `textures/overlays.py` | S3 wetness/moss/graffiti. Seeded; density 0 is a no-op. |
 | `is_3d_opening` / `leftover_patches` | `converter/opening.py` | S4 punch math. Billboard and `alpha_blend` stay cards. |

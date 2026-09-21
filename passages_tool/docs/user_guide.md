@@ -31,6 +31,7 @@ The **Passages Level Editor** is a standalone 2D editor for level geometry used 
 
 - Draw **Walls**, **Arches**, **EyePaths**, and **Anchors**
 - Assign textures from a browsable palette (including per-wall intervals)
+- Pick a **style pack** and arch **dressing** kinds (opening, niche, volume, recess)
 - Pan and zoom a grid-backed orthographic viewport
 - Preview a 3D viewpoint from a selected EyePath edge
 - Save and load levels as `.passages.json` (version 2)
@@ -90,8 +91,8 @@ Open `passages_tool/` as the workspace root. Select interpreter `.venv\Scripts\p
 ## 3. From empty window to baked frames
 
 1. Launch with `run.bat`. Confirm the Textures panel lists sample PNGs (extract `sample_assets.tar` if it is empty).
-2. **File → Open…** a sample such as `json/verify.passages.json`, or draw your own (Wall `W`, EyePath `E`, Arch `A`, Anchor `R`).
-3. Toggle **Snap** (`G`) if you want vertices on the visible grid. Grid spacing is `snap_grid` in Level Properties (default 0.25 m).
+2. **File → Open…** a sample such as `json/style_demo.passages.json` or `json/verify.passages.json`, or draw your own (Wall `W`, EyePath `E`, Arch `A`, Anchor `R`).
+3. Toggle **Snap** (`G`) if you want vertices on the visible grid. Grid spacing is `snap_grid` in Level Properties (default 0.25 m). For a style pack: Browse `assets/sample_textures`, then in Level Properties pick **Style**. On a fixed Arch, use **Dressing → Kind**.
 4. Press **Validate** (`V`). Fix untextured walls (skipped if `meta.style` is set), missing floor/ceiling, edge-on arches, and style/preset errors. Use **Select** on a warning to frame that polyline.
 5. Select an EyePath, pick a directed edge, click **Render Preview** in Properties to confirm the 3D view.
 6. **File → Save** (`.passages.json`).
@@ -204,7 +205,7 @@ Undo coalesces a slider/drag into one step. The first click of a new wall is one
 
 1. First launch scans `assets/sample_textures/` (including subfolders). **Browse folder…** to pick another; the path is remembered.
 2. Click a thumbnail to select it.
-3. Assign from Properties: wall **interval** Assign, arch texture Assign, or Level **Floor / Ceiling** Assign.
+3. Assign from Properties: wall **interval** Assign, arch texture or **side texture** Assign, or Level **Floor / Ceiling** Assign.
 
 Names are paths relative to the folder (`base/brick.png` if nested). Folders named `presets/`, `overlays/`, `_style_cache/`, and `_meta_cache/` are hidden from the palette.
 
@@ -212,7 +213,7 @@ Names are paths relative to the folder (`base/brick.png` if nested). Folders nam
 
 A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Pick it in Level Properties → **Style** (or set `"style"` in the JSON). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
 
-On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` POM dip (needs style); `"kind": "volume"` pilaster into the room; `"kind": "recess"` walk-in box into the wall (punches). Style `"loop_u"` continues tiling around corners (default true). `"ceiling": { "mode": "none" }` or `meta.ceiling_mode` skips the roof; `"beams"` hang under the ceiling. Demo: `json/style_demo.passages.json`.
+On a **fixed** Arch, **Properties → Dressing → Kind**: Opening (3D slab + punch), Niche (POM dip, needs style), Volume (pilaster into the room), Recess (walk-in box into the wall). Style `"loop_u"` continues tiling around corners (default true). Ceiling combo **None** skips the roof; style `"beams"` hang under the ceiling. Demo: `json/style_demo.passages.json`.
 
 Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`.
 
