@@ -26,7 +26,7 @@ Status: **done** · **partial** · **open**
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | 11 and 12 done; remaining items unscheduled |
 
-Tests at last S7 commit: **255 passed** (1 gpu skipped).
+Tests at last editor-UX commit: **256 passed** (1 gpu skipped).
 
 ---
 
@@ -333,7 +333,7 @@ P2 architecture (including 5.5 EggContext texture parenting) is done. **4.1** mu
 
 **Style dressing** (`design_docs/passages_style_dressing_20SEP26.md`) is the primary dressing plan: environment **bands**, clicked **interruptions** (3D opening slabs vs POM niches), seeded **overlays**. The older index-map + 8-slot GPU plan (`passages_pom_metatexture_14SEP26.md`) is **superseded as authoring interchange**. Keep Phase 0 (custom GLSL offscreen **passed**), UV-in-meters, unique-map compose, and silhouette POM. Do not start old P1 (R-codes / arrays) unless a painted override mask is needed later.
 
-**S1–S7** done. Style dressing v1 is complete: bands, overlays, openings, niches, volumes, loop-U, recesses, ceiling beams, no-roof. Next is authoring UX (kind combo / style picker) if wanted — not a bake leftover.
+**S1–S7** done. Editor UX: Level Properties style picker + POM/overlay seed/ceiling mode; Arch Dressing kind combo (opening/niche/volume/recess).
 
 ---
 

@@ -9,9 +9,8 @@ Type-specific sections (v3 — Phase 3 complete)
            (assign texture from palette, set x_offset, split, remove,
            add new interval); vertex list.
 
-  ARCH     Type selector; position; orientation (billboard / angle);
-           width; height override; texture assign; transparency;
-           z-offset; v-at-floor; light-source sub-section.
+  ARCH     Type selector; position; orientation; dressing (kind / profile /
+           depth / side texture); texture; transparency; light source.
 
   EYEPATH  Type selector; directed edge editor (add / remove edges by
            vertex index); vertex list.
@@ -50,6 +49,12 @@ _TYPE_LABELS = ["Wall", "Arch", "EyePath", "Anchor"]
 _TYPE_VALUES = ["wall", "arch", "eyepath", "anchor"]
 _TRANS_LABELS = ["None", "Alpha test", "Alpha blend"]
 _TRANS_VALUES = ["none", "alpha_test", "alpha_blend"]
+_KIND_LABELS = ["Card", "Opening", "Niche", "Volume", "Recess"]
+_KIND_VALUES = [None, "opening", "niche", "volume", "recess"]
+_PROFILE_LABELS = ["(style default)", "Rect", "Round", "Gothic"]
+_PROFILE_VALUES = [None, "rect", "round", "gothic"]
+_CEIL_MODE_LABELS = ["(style default)", "Closed", "None (no roof)"]
+_CEIL_MODE_VALUES = [None, "closed", "none"]
 
 # Soft tints shown next to each interval label (matches INTERVAL_COLORS).
 _IV_TINTS = [
@@ -471,6 +476,78 @@ class PropertiesPanel:
 
         imgui.separator()
 
+        # ── Dressing (style openings / niches / volumes / recesses) ───────────
+        imgui.text_colored((0.25, 0.82, 0.91, 1.0), "Dressing")
+        if is_billboard:
+            imgui.text_disabled("Fixed angle required (uncheck Billboard).")
+        else:
+            raw_kind = getattr(polyline, "kind", None) or None
+            try:
+                kind_idx = _KIND_VALUES.index(raw_kind)
+            except ValueError:
+                kind_idx = 0
+            imgui.text("Kind")
+            imgui.set_next_item_width(-1)
+            kc, kni = imgui.combo("##arch_kind", kind_idx, _KIND_LABELS)
+            if kc:
+                fn = self._cb.get("set_field")
+                if fn:
+                    new_kind = _KIND_VALUES[kni]
+                    fn(polyline.id, "kind", new_kind)
+                    # Card + leftover depth_m would still bake as an opening.
+                    if new_kind is None:
+                        fn(polyline.id, "depth_m", None)
+            kind = _KIND_VALUES[kni] if kc else raw_kind
+
+            if kind in ("opening", "recess"):
+                raw_prof = getattr(polyline, "profile", None) or None
+                try:
+                    pidx = _PROFILE_VALUES.index(raw_prof)
+                except ValueError:
+                    pidx = 0
+                imgui.text("Profile")
+                imgui.set_next_item_width(-1)
+                pc, pni = imgui.combo("##arch_prof", pidx, _PROFILE_LABELS)
+                if pc:
+                    fn = self._cb.get("set_field")
+                    if fn:
+                        fn(polyline.id, "profile", _PROFILE_VALUES[pni])
+
+            if kind in ("opening", "volume", "recess"):
+                shown_d = getattr(polyline, "depth_m", None)
+                shown_d = float(shown_d) if shown_d is not None else 0.4
+                imgui.text("Depth (m)")
+                imgui.set_next_item_width(-1)
+                dc, nd = imgui.input_float(
+                    "##arch_depth", shown_d, step=0.05, format="%.2f")
+                if dc:
+                    fn = self._cb.get("set_field")
+                    if fn:
+                        fn(polyline.id, "depth_m", max(0.05, nd))
+
+            if kind in ("opening", "volume", "recess"):
+                side = getattr(polyline, "side_texture", None)
+                imgui.text("Side texture")
+                imgui.text_disabled((side or "(style / front)")[-26:])
+                if palette_sel and palette_sel != side:
+                    if imgui.button("Assign side"):
+                        fn = self._cb.get("set_field")
+                        if fn:
+                            fn(polyline.id, "side_texture", palette_sel)
+                if side:
+                    imgui.same_line()
+                    if imgui.button("Clear##side"):
+                        fn = self._cb.get("set_field")
+                        if fn:
+                            fn(polyline.id, "side_texture", None)
+
+            if kind == "niche":
+                imgui.text_disabled("Needs a style pack (unique wall maps + POM).")
+            if kind == "volume":
+                imgui.text_disabled("Keep width modest (not the 4 m door default).")
+
+        imgui.separator()
+
         # ── Texture & transparency ────────────────────────────────────────────
         imgui.text_colored((0.25, 0.82, 0.91, 1.0), "Texture")
         tex_label = polyline.texture or "(none)"
@@ -885,7 +962,59 @@ class PropertiesPanel:
             fn("render_height", max(1, rh_val))
 
         imgui.separator()
+        imgui.text_colored((0.28, 0.91, 0.50, 1.0), "Style dressing")
 
+        style_ids: list[str] = []
+        list_fn = self._cb.get("list_styles")
+        if list_fn:
+            try:
+                style_ids = list(list_fn() or [])
+            except Exception:
+                style_ids = []
+        style_labels = ["(none)"] + style_ids
+        cur_style = (m.style or "").strip()
+        if cur_style and cur_style not in style_ids:
+            style_labels.append(cur_style)
+        try:
+            sidx = style_labels.index(cur_style) if cur_style else 0
+        except ValueError:
+            sidx = 0
+        imgui.text("Style")
+        imgui.set_next_item_width(-1)
+        sc, sni = imgui.combo("##meta_style", sidx, style_labels)
+        if sc and fn:
+            fn("style", None if sni == 0 else style_labels[sni])
+        if not style_ids:
+            imgui.text_disabled("No styles/*.json in the texture folder.")
+
+        pom_on = bool(getattr(m, "pom_enabled", False))
+        pc, npom = imgui.checkbox("POM enabled", pom_on)
+        if pc and fn:
+            fn("pom_enabled", bool(npom))
+
+        use_seed = m.overlay_seed is not None
+        oc, nuse = imgui.checkbox("Override overlay seed", use_seed)
+        if oc and fn:
+            fn("overlay_seed", 0 if nuse else None)
+        if m.overlay_seed is not None:
+            imgui.text("Overlay seed")
+            imgui.set_next_item_width(-1)
+            ic, nseed = imgui.input_int("##meta_oseed", int(m.overlay_seed))
+            if ic and fn:
+                fn("overlay_seed", int(nseed))
+
+        raw_cm = getattr(m, "ceiling_mode", None)
+        try:
+            cidx = _CEIL_MODE_VALUES.index(raw_cm)
+        except ValueError:
+            cidx = 0
+        imgui.text("Ceiling")
+        imgui.set_next_item_width(-1)
+        cc, cni = imgui.combo("##meta_cmode", cidx, _CEIL_MODE_LABELS)
+        if cc and fn:
+            fn("ceiling_mode", _CEIL_MODE_VALUES[cni])
+
+        imgui.separator()
         imgui.text_colored((0.28, 0.91, 0.50, 1.0), "Textures")
 
         # Floor texture

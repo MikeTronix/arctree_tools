@@ -9,6 +9,7 @@ from passages_tool.editor.level import Level
 from passages_tool.editor.validator import validate_style
 from passages_tool.textures.style import (
     StyleError,
+    list_style_ids,
     load_style,
     preset_has_diffuse,
     style_json_path,
@@ -61,6 +62,16 @@ def _touch_preset(root, preset_id: str) -> None:
     d = root / "presets" / preset_id
     d.mkdir(parents=True, exist_ok=True)
     (d / "diffuse.png").write_bytes(b"\x89PNG\r\n")
+
+
+def test_list_style_ids(tmp_path):
+    assert list_style_ids(None) == []
+    assert list_style_ids(tmp_path) == []
+    (tmp_path / "styles").mkdir()
+    (tmp_path / "styles" / "crypt_ashlar.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "styles" / "elven.json").write_text("{}", encoding="utf-8")
+    (tmp_path / "styles" / "notes.txt").write_text("x", encoding="utf-8")
+    assert list_style_ids(tmp_path) == ["crypt_ashlar", "elven"]
 
 
 def test_style_json_path_id_and_relative(tmp_path):

@@ -217,6 +217,11 @@ class CommandsMixin:
         self._level.remove_eyepath_edge(pid, v_from, v_to)
         self._pm.rebuild_one(pid)
 
+    def _cb_list_styles(self) -> list:
+        from passages_tool.textures.style import list_style_ids
+
+        return list_style_ids(self._tex.base_dir)
+
     def _cb_set_meta_field(self, field: str, value) -> None:
         if field == "fov_h":
             return

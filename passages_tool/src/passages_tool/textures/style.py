@@ -108,6 +108,16 @@ class StylePack:
         return tuple(out)
 
 
+def list_style_ids(texture_dir: Optional[Path]) -> list[str]:
+    """Stem names of ``styles/*.json`` in the texture folder, sorted."""
+    if texture_dir is None:
+        return []
+    d = Path(texture_dir) / "styles"
+    if not d.is_dir():
+        return []
+    return sorted(p.stem for p in d.glob("*.json") if p.is_file())
+
+
 def style_json_path(texture_dir: Path, style: str) -> Path:
     """Resolve ``LevelMeta.style`` (id or relative .json) under ``texture_dir``."""
     raw = str(style).strip().replace("\\", "/")

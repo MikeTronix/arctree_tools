@@ -131,6 +131,7 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
             "add_eyepath_edge":        self._cb_add_eyepath_edge,
             "remove_eyepath_edge":     self._cb_remove_eyepath_edge,
             "set_meta_field":          self._cb_set_meta_field,
+            "list_styles":             self._cb_list_styles,
             "render_preview":          self._cb_render_preview,
         })
 

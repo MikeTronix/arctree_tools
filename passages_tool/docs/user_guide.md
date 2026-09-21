@@ -176,7 +176,7 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 One click. If you place near a wall, the tool offers a perpendicular snap: **Enter** accepts, **Esc** or another click / tool switch keeps **billboard**.
 
-For a thick door or window, keep a **fixed** angle and set `"kind": "opening"` (or `"depth_m"`) in the level JSON. For an alcove, `"kind": "niche"` plus `meta.style`. For a pillar, `"kind": "volume"` with a modest `width`/`depth_m`. Billboard stays a card. There is no kind combo in Properties yet.
+**Dressing** (fixed angle, not billboard): Kind combo — Card, Opening, Niche, Volume, Recess. Opening/Recess show Profile and Depth; Volume/Opening/Recess can Assign a side texture from the palette. Niche needs a style pack. Billboard stays a card.
 
 ### EyePaths
 
@@ -210,7 +210,7 @@ Names are paths relative to the folder (`base/brick.png` if nested). Folders nam
 
 ### Style packs (optional)
 
-A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Set `"style": "<id>"` on the level `meta` (no picker yet). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
+A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Pick it in Level Properties → **Style** (or set `"style"` in the JSON). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
 
 On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` POM dip (needs style); `"kind": "volume"` pilaster into the room; `"kind": "recess"` walk-in box into the wall (punches). Style `"loop_u"` continues tiling around corners (default true). `"ceiling": { "mode": "none" }` or `meta.ceiling_mode` skips the roof; `"beams"` hang under the ceiling. Demo: `json/style_demo.passages.json`.
 
@@ -222,7 +222,7 @@ Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Enginee
 
 ### Level (always available)
 
-Name, author, wall height, eye height, **FOV vertical** (horizontal is shown read-only: derived from VFOV × `render_width`/`render_height`), fog, snap grid, bake resolution, floor/ceiling textures. Optional dressing: `meta.style` / `overlay_seed` / `pom_enabled` in the JSON (style picker not in the panel yet).
+Name, author, wall height, eye height, **FOV vertical** (horizontal is shown read-only: derived from VFOV × `render_width`/`render_height`), fog, snap grid, bake resolution, floor/ceiling textures. **Style dressing:** Style combo (scans `styles/*.json`), POM checkbox, overlay-seed override, Ceiling (style default / closed / none).
 
 Default bake size is **1024×576** (16:9). At 60° VFOV that yields about **91.5°** HFOV. Changing resolution or VFOV rewrites `fov_h` on save so the game client stays aligned with the baker.
 
@@ -232,7 +232,7 @@ Closed flag; texture intervals (assign, x-offset, split, remove, add); vertex li
 
 ### Arch
 
-Position; billboard vs angle; auto-snap to walls; width / height override; texture; transparency (`none` / `alpha_test` / `alpha_blend`); z-offset; v-at-floor; optional point light. Optional JSON: `kind` (`opening` punches a 3D slab; `niche` POM recess on the intact wall), `profile` (`rect`/`round`/`gothic`), `depth_m`, `side_texture`. Billboard stays a card. Niches need `meta.style` so unique maps exist.
+Position; billboard vs angle; auto-snap; width / height; Dressing (kind / profile / depth / side texture); texture; transparency; z-offset; v-at-floor; optional point light.
 
 ### EyePath
 
