@@ -319,7 +319,7 @@ Slider grouping is done via `_hist` coalesce. Command-pattern history is only ne
 10. Drop tkinter file dialogs.
 11. **Turn slew from a per-node yaw strip (client + baker).** **done (compat).** Baker writes extra `yaw_vXXXX.png` (four 90° faces, ~341px tall at default 576). Manifest `eyepoints.*.yaw_strip` is **optional** — omitted on old bakes. Client pans a `fov_h` window (80–400 ms by |Δyaw|) then lands on the hi-res still; if the key or file is missing, the still-to-still crossfade is unchanged. `--no-yaw-strip` skips extras. Do not replace sharp viewpoints with the strip.
 12. **Adjustable / HiDPI UI scale (editor).** **done.** View → UI Scale is 100/125/150/200%. Persisted as `ui_scale` in `editor_state.json`. First launch (no saved key) snaps Windows DPI/96 to the nearest preset. imgui-bundle 1.92: `style.font_scale_main` + relative `style.scale_all_sizes`. Side panels, vertex fields, and thumbnails grow; viewport world units, grid, and handle radii do not.
-13. **Style dressing (bands / interruptions / overlays).** **planned.** `design_docs/passages_style_dressing_20SEP26.md`. Not the 8-slot painted index. S1 style JSON next.
+13. **Style dressing (bands / interruptions / overlays).** **S1–S5 done.** Bands in meters, seeded overlays, 3D openings, POM niches. Not the 8-slot painted index. Remaining: S6 volume box + demo style; S7 optional (loop U, walk-in recess, ceiling beams). `design_docs/passages_style_dressing_20SEP26.md`.
 
 Out of scope: `passages_dm` bindings, combat, runtime FOV. Do not grow tags into a content editor.
 

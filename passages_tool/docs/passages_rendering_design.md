@@ -256,6 +256,8 @@ For each edge `(v_i, v_{i+1})` in a Wall polyline within a single texture interv
 3. Compute U coordinates from cumulative arc length; carry UV offset across interval boundaries.
 4. Emit two triangles (one quad).
 
+**Style dressing (2026-09-20):** if `meta.style` is set, untextured edges get unique maps in **meters** (`_style_cache/`, UV 0…1). Interval PNGs stay the path above (override). 3D **openings** subtract leftover patches from the wall (hole + strip above). **Niches** do not punch; they dip a sibling `*_h.png`. See `design_docs/passages_style_dressing_20SEP26.md`.
+
 ### 7.3 Path Tangent Computation (for Arches)
 
 For a fixed-orientation Arch placed along a passage:
@@ -271,6 +273,8 @@ For each Arch:
 4. Set `TransparencyAttrib` per the `transparency` field.
 5. Place as a separate `GeomNode` (not merged) to allow correct depth sorting.
 
+**Openings / niches:** a non-billboard arch with `kind=opening` or `depth_m>0` is a 3D slab (profile `rect`/`round`/`gothic`, wall punch, n-slice skipped). `kind=niche` stays a planar span on the wall for POM. `alpha_blend` and billboard stay cards.
+
 > **Depth sorting:** Panda3D's `NodePath.setTransparency(TransparencyAttrib.MAlpha)` handles back-to-front sorting automatically when nodes are separate.  `TransparencyAttrib.MDual` (two-pass) is the fallback for overlapping arches.
 
 ### 7.5 Floor and Ceiling Generation
@@ -282,7 +286,7 @@ For each Arch:
 
 - **Model:** Simple diffuse point lighting.
 - **Sources:** Torch and window Arches also create `PointLight` nodes at the same position.
-- **Shader:** Panda3D's default auto-shader.  No custom GLSL needed at this stage.
+- **Shader:** Panda3D's default auto-shader. Unique walls that have a `*_h.png` sibling bind bake-time silhouette POM (`renderer/pom.py`) after `load_scene`.
 - **Fog:** `ExponentialFog` (or linear) applied to limit visible depth and disguise the geometry cutoff.
 
 ### 7.7 Visibility and Culling (per EyePath viewpoint)

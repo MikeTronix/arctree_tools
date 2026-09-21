@@ -176,11 +176,13 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 One click. If you place near a wall, the tool offers a perpendicular snap: **Enter** accepts, **Esc** or another click / tool switch keeps **billboard**.
 
+For a thick door or window, keep a **fixed** angle and set `"kind": "opening"` (or `"depth_m"`) in the level JSON. For an alcove, `"kind": "niche"` plus `meta.style`. Billboard stays a card. There is no kind combo in Properties yet.
+
 ### EyePaths
 
 Vertices are standing points. Directed **edges** are the baked views (`v_from` looking at `v_to`). Drawing consecutive vertices adds those edges automatically. Insert-vertex **splits** the spanned edge (and the reverse if present).
 
-Bake and preview use the **first** EyePath only. Validate warns if there is more than one.
+Bake and preview use **every** EyePath (global vertex offset; first path keeps `v0000_to_v0001` keys).
 
 ### Anchors
 
@@ -204,13 +206,15 @@ Undo coalesces a slider/drag into one step. The first click of a new wall is one
 2. Click a thumbnail to select it.
 3. Assign from Properties: wall **interval** Assign, arch texture Assign, or Level **Floor / Ceiling** Assign.
 
-Names are paths relative to the folder (`base/brick.png` if nested). Folders named `presets/`, `_style_cache/`, and `_meta_cache/` are hidden from the palette.
+Names are paths relative to the folder (`base/brick.png` if nested). Folders named `presets/`, `overlays/`, `_style_cache/`, and `_meta_cache/` are hidden from the palette.
 
 ### Style packs (optional)
 
 A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Set `"style": "<id>"` on the level `meta` (no picker yet). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
 
-Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`. Overlay densities > 0 stamp wetness/moss/graffiti (seeded; 0 = unchanged bands).
+On a **fixed** arch in the JSON: `"kind": "opening"` (or `"depth_m"`) punches a 3D slab; `"kind": "niche"` leaves the wall and bakes a POM recess (needs the style). Overlay densities > 0 stamp wetness/moss/graffiti (seeded; 0 = unchanged bands).
+
+Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`.
 
 ---
 
@@ -320,7 +324,7 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
 | Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
 | EyePath `edges` | Directed `[from, to]` pairs |
-| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` or `depth_m`>0 → 3D slab + wall punch |
+| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` or `depth_m`>0 → 3D slab + wall punch. `niche` → POM dip, wall intact (needs style) |
 
 ---
 
