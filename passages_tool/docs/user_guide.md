@@ -14,7 +14,7 @@
 5. [Viewport Navigation](#5-viewport-navigation)
 6. [Tool Modes](#6-tool-modes)
 7. [Working with Geometry](#7-working-with-geometry)
-8. [Texture Palette](#8-texture-palette)
+8. [Texture Palette](#8-texture-palette) (style packs)
 9. [Properties Panel](#9-properties-panel)
 10. [Validate](#10-validate)
 11. [File Operations](#11-file-operations)
@@ -92,7 +92,7 @@ Open `passages_tool/` as the workspace root. Select interpreter `.venv\Scripts\p
 1. Launch with `run.bat`. Confirm the Textures panel lists sample PNGs (extract `sample_assets.tar` if it is empty).
 2. **File → Open…** a sample such as `json/verify.passages.json`, or draw your own (Wall `W`, EyePath `E`, Arch `A`, Anchor `R`).
 3. Toggle **Snap** (`G`) if you want vertices on the visible grid. Grid spacing is `snap_grid` in Level Properties (default 0.25 m).
-4. Press **Validate** (`V`). Fix untextured walls, missing floor/ceiling, extra EyePaths, and edge-on arches. Use **Select** on a warning to frame that polyline.
+4. Press **Validate** (`V`). Fix untextured walls (skipped if `meta.style` is set), missing floor/ceiling, edge-on arches, and style/preset errors. Use **Select** on a warning to frame that polyline.
 5. Select an EyePath, pick a directed edge, click **Render Preview** in Properties to confirm the 3D view.
 6. **File → Save** (`.passages.json`).
 7. From the tool folder:
@@ -204,7 +204,13 @@ Undo coalesces a slider/drag into one step. The first click of a new wall is one
 2. Click a thumbnail to select it.
 3. Assign from Properties: wall **interval** Assign, arch texture Assign, or Level **Floor / Ceiling** Assign.
 
-Names are paths relative to the folder (`base/brick.png` if nested).
+Names are paths relative to the folder (`base/brick.png` if nested). Folders named `presets/`, `_style_cache/`, and `_meta_cache/` are hidden from the palette.
+
+### Style packs (optional)
+
+A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Set `"style": "<id>"` on the level `meta` (no picker yet). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
+
+Authoring the pack: `writer_docs/passages_style_preparation_20SEP26.md`. Engineering plan: `design_docs/passages_style_dressing_20SEP26.md`.
 
 ---
 
@@ -212,7 +218,7 @@ Names are paths relative to the folder (`base/brick.png` if nested).
 
 ### Level (always available)
 
-Name, author, wall height, eye height, **FOV vertical** (horizontal is shown read-only: derived from VFOV × `render_width`/`render_height`), fog, snap grid, bake resolution, floor/ceiling textures.
+Name, author, wall height, eye height, **FOV vertical** (horizontal is shown read-only: derived from VFOV × `render_width`/`render_height`), fog, snap grid, bake resolution, floor/ceiling textures. Optional dressing: `meta.style` / `overlay_seed` / `pom_enabled` in the JSON (style picker not in the panel yet).
 
 Default bake size is **1024×576** (16:9). At 60° VFOV that yields about **91.5°** HFOV. Changing resolution or VFOV rewrites `fov_h` on save so the game client stays aligned with the baker.
 
@@ -238,10 +244,10 @@ Position, radius, height, z-offset, tags.
 
 **Validate** on the menu bar or `V`. Checks:
 
-- Untextured wall edges (including the closing edge of a closed wall), missing floor/ceiling
+- Untextured wall edges (including the closing edge of a closed wall), missing floor/ceiling. Skipped for walls when `meta.style` is set (bands cover those edges)
 - Overlapping texture intervals
 - Fixed arches that are edge-on from an EyePath view (within fog)
-- More than one EyePath (bake uses only the first)
+- Style pack: missing `styles/<id>.json`, invalid JSON, missing `presets/<id>/diffuse.png`, unknown opening profile
 
 Flagged polylines turn red. Click **Select** on a warning to frame that object. Floor/ceiling warnings have no polyline to jump to.
 
@@ -304,7 +310,9 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | Field | Notes |
 |---|---|
 | `meta.fov_v`, `render_width`, `render_height` | Authored. `fov_h` is derived and rewritten on load/save |
-| `meta.pixels_per_meter` | Texture scale (legacy `texture_pixel_size` migrates) |
+| `meta.pixels_per_meter` | Texture scale (legacy `texture_pixel_size` migrates). With a style, this is unique-map resolution (default 256 px/m), not room size |
+| `meta.style` | Optional style id → `styles/<id>.json` under the texture folder |
+| `meta.overlay_seed`, `meta.pom_enabled` | Optional; stored, not applied to stills yet |
 | `meta.snap_grid` | Editor snap and visual grid |
 | `grid.cell_size` | Serialized leftover; the viewport does not use it |
 | `tiles` | Legacy; ignored on load, not written |

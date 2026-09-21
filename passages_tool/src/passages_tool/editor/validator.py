@@ -48,7 +48,8 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
     """
     Warn about assignable surfaces with no texture assigned — these render
     transparent. Checks every Wall edge (via its texture_intervals) plus the
-    level floor and ceiling.
+    level floor and ceiling. Styled levels (`meta.style` set) skip the
+    untextured-wall check: S2 compose covers those edges.
 
     Floor/ceiling warnings have empty ``target_id`` (level meta, not a polyline).
     """
@@ -88,7 +89,7 @@ def validate_textures(level: Level) -> list[ValidationWarning]:
                         ),
                     ))
                     break
-        if uncovered:
+        if uncovered and not (level.meta.style or "").strip():
             shown = ", ".join(str(e) for e in uncovered[:8])
             more = "" if len(uncovered) <= 8 else f" (+{len(uncovered) - 8} more)"
             msg = (

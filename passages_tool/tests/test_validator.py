@@ -157,6 +157,18 @@ def test_validate_textures_closed_wall_missing_closing_not_false_positive():
     assert "untextured" in warnings[0].message
 
 
+def test_validate_textures_style_skips_untextured_walls():
+    """S2 compose covers edges; a style means empty intervals are not a bake hole."""
+    level = Level()
+    level.meta.style = "crypt_ashlar"
+    level.meta.floor_texture = "floor.png"
+    level.meta.ceiling_texture = "ceil.png"
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (4.0, 0.0)]
+    level.add_polyline(wall)
+    assert validate_textures(level) == []
+
+
 def test_webp_mislabeled_as_png(tmp_path):
     from PIL import Image
     from passages_tool.textures.manager import TextureManager

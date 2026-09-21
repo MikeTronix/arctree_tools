@@ -26,7 +26,7 @@ Status: **done** · **partial** · **open**
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | 11 and 12 done; remaining items unscheduled |
 
-Tests at last S2 commit: **219 passed** (1 gpu skipped).
+Tests at last S2 commit: **220 passed** (1 gpu skipped; plus styled untextured-wall skip).
 
 ---
 
