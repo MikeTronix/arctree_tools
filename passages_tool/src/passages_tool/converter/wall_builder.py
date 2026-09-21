@@ -23,6 +23,7 @@ from passages_tool.editor.level import (
 )
 from passages_tool.converter.opening import (
     WallHole,
+    collect_niche_spans,
     collect_opening_punches,
     leftover_patches,
 )
@@ -147,6 +148,7 @@ def build_wall_strips(
     pack = _try_style_pack(level, texture_dir)
     preset_images: dict = {}
     punches = collect_opening_punches(level)
+    niches = collect_niche_spans(level)
 
     for pl in level.polylines.values():
         if pl.type != PolylineType.WALL or len(pl.vertices) < 2:
@@ -162,6 +164,7 @@ def build_wall_strips(
                 pl, group, ctx, pack, texture_dir, wall_height, ppm, preset_images,
                 overlay_seed=level.meta.overlay_seed,
                 punches=punches,
+                niches=niches,
             )
         else:
             has_polys = _build_interval_wall(
@@ -210,6 +213,7 @@ def _build_styled_wall(
     preset_images: dict,
     overlay_seed: Optional[int] = None,
     punches: Optional[dict] = None,
+    niches: Optional[dict] = None,
 ) -> bool:
     from passages_tool.textures.band_compose import write_edge_diffuse
 
@@ -249,6 +253,7 @@ def _build_styled_wall(
                 ppm,
                 preset_images=preset_images,
                 overlay_seed=overlay_seed,
+                niches=(niches.get((pl.id, v_from), []) if niches else []),
             )
         egg_tex = ctx.get_or_create_texture(rel) if rel else None
         holes = []

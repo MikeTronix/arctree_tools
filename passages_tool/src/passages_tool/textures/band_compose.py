@@ -135,10 +135,11 @@ def compose_edge_diffuse(
     return out
 
 
-def cache_relpath(style_id: str, wall_id: str, edge_idx: int) -> str:
+def cache_relpath(style_id: str, wall_id: str, edge_idx: int, *, height: bool = False) -> str:
     sid = "".join(c if c.isalnum() or c in "-_" else "_" for c in style_id) or "style"
     wid = "".join(c if c.isalnum() or c in "-_" else "_" for c in wall_id) or "wall"
-    return f"{STYLE_CACHE_DIR}/{sid}/wall_{wid}_e{edge_idx}.png"
+    suffix = "_h.png" if height else ".png"
+    return f"{STYLE_CACHE_DIR}/{sid}/wall_{wid}_e{edge_idx}{suffix}"
 
 
 def write_edge_diffuse(
@@ -152,6 +153,7 @@ def write_edge_diffuse(
     *,
     preset_images: Optional[dict[str, Image.Image]] = None,
     overlay_seed: Optional[int] = None,
+    niches=None,
 ) -> Optional[str]:
     """Write the unique map under ``texture_dir/_style_cache/``. Relative posix path."""
     img = compose_edge_diffuse(
@@ -167,6 +169,15 @@ def write_edge_diffuse(
     )
     if img is None:
         return None
+    if niches:
+        from passages_tool.textures.niche import apply_niche_dip
+
+        himg = Image.new("L", img.size, 255)
+        apply_niche_dip(img, himg, niches, length_m, height_m, ppm)
+        hrel = cache_relpath(pack.id, wall_id, edge_idx, height=True)
+        hdest = Path(texture_dir) / hrel
+        hdest.parent.mkdir(parents=True, exist_ok=True)
+        himg.save(hdest, "PNG")
     rel = cache_relpath(pack.id, wall_id, edge_idx)
     dest = Path(texture_dir) / rel
     dest.parent.mkdir(parents=True, exist_ok=True)

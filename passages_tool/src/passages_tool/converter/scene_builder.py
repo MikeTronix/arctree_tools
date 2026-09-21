@@ -78,7 +78,12 @@ def build_scene(
     return output_dir / "walls.egg"
 
 
-def load_scene(level: Level, egg_dir: Path, loader: Any) -> NodePath:
+def load_scene(
+    level: Level,
+    egg_dir: Path,
+    loader: Any,
+    texture_dir: Optional[Path] = None,
+) -> NodePath:
     """
     Load the exported level EGG files into a Panda3D scene graph NodePath,
     attaching the corresponding lighting and fog.
@@ -105,5 +110,20 @@ def load_scene(level: Level, egg_dir: Path, loader: Any) -> NodePath:
 
     # Enable the auto-shader so lighting, textures, normals, and fog are computed correctly
     scene_root.set_shader_auto()
+
+    if texture_dir is not None:
+        try:
+            from passages_tool.renderer.pom import apply_style_pom
+            from passages_tool.textures.style import StyleError, load_level_style
+
+            pack = None
+            if level.meta.style:
+                try:
+                    pack = load_level_style(Path(texture_dir), level.meta.style)
+                except StyleError:
+                    pack = None
+            apply_style_pom(scene_root, level, Path(texture_dir), loader, pack)
+        except Exception:
+            pass
 
     return scene_root

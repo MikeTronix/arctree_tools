@@ -228,7 +228,7 @@ Closed flag; texture intervals (assign, x-offset, split, remove, add); vertex li
 
 ### Arch
 
-Position; billboard vs angle; auto-snap to walls; width / height override; texture; transparency (`none` / `alpha_test` / `alpha_blend`); z-offset; v-at-floor; optional point light. Optional JSON: `kind` (`opening`), `profile` (`rect`/`round`/`gothic`), `depth_m`, `side_texture` — 3D slab that punches the wall (billboard stays a card).
+Position; billboard vs angle; auto-snap to walls; width / height override; texture; transparency (`none` / `alpha_test` / `alpha_blend`); z-offset; v-at-floor; optional point light. Optional JSON: `kind` (`opening` punches a 3D slab; `niche` POM recess on the intact wall), `profile` (`rect`/`round`/`gothic`), `depth_m`, `side_texture`. Billboard stays a card. Niches need `meta.style` so unique maps exist.
 
 ### EyePath
 

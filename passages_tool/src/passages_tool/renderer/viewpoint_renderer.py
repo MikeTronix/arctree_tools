@@ -42,7 +42,9 @@ class ViewpointRenderer:
         # Load the assembled scene graph as its own tree — do not parent it to
         # the editor's `render`, or 3D walls flash into the 2D viewport. The
         # offscreen camera is reparented onto scene_root, so it still sees it.
-        self.scene_root = load_scene(self.level, self.scene_dir, self.base.loader)
+        self.scene_root = load_scene(
+            self.level, self.scene_dir, self.base.loader, self.texture_dir
+        )
 
     def _eyepath_endpoints(
         self, v_from: int, v_to: int

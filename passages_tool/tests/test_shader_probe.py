@@ -19,6 +19,8 @@ def test_probe_shaders_exist():
         "probe_const.frag.glsl",
         "probe_array.vert.glsl",
         "probe_array.frag.glsl",
+        "pom.vert.glsl",
+        "pom.frag.glsl",
     ):
         assert (SHADER_DIR / name).is_file(), name
 

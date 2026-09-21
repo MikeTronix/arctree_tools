@@ -26,7 +26,7 @@ Status: **done** · **partial** · **open**
 | §7 Tests | **partial** | P0/P1 contracts covered; `main.py` / ImGui still untested |
 | §8 Feature opportunities | **open** | 11 and 12 done; remaining items unscheduled |
 
-Tests at last S4 commit: **239 passed** (1 gpu skipped).
+Tests at last S5 commit: **246 passed** (1 gpu skipped).
 
 ---
 
@@ -50,6 +50,7 @@ Do not re-derive these; extend them.
 | `compose_edge_diffuse` / `write_edge_diffuse` | `textures/band_compose.py` | S2 unique wall-edge maps. U = meters along edge, V = world Z. Interval PNG override. |
 | `apply_overlays` | `textures/overlays.py` | S3 wetness/moss/graffiti. Seeded; density 0 is a no-op. |
 | `is_3d_opening` / `leftover_patches` | `converter/opening.py` | S4 punch math. Billboard and `alpha_blend` stay cards. |
+| `apply_niche_dip` / `apply_style_pom` | `textures/niche.py`, `renderer/pom.py` | S5 recess on unique maps; silhouette POM when `*_h.png` exists. |
 | `build_scene(..., write_combined=True)` | `converter/scene_builder.py` | One geometry pass writes the four component eggs. Combined `scene.egg` is `<File>` includes of those eggs (`EggExternalReference`) — not a second tessellation. Preview and baker pass `write_combined=False`; converter CLI still writes combined for pview. |
 | `_write_egg(path, groups)` | `converter/scene_builder.py` | One-file EggData writer used by the four parts. Calls `parent_textures`. |
 | `parent_textures(egg, groups)` | `converter/egg_writer.py` | `add_child` each unique polygon-bound `EggTexture` onto the EggData being written. |
@@ -332,7 +333,7 @@ P2 architecture (including 5.5 EggContext texture parenting) is done. **4.1** mu
 
 **Style dressing** (`design_docs/passages_style_dressing_20SEP26.md`) is the primary dressing plan: environment **bands**, clicked **interruptions** (3D opening slabs vs POM niches), seeded **overlays**. The older index-map + 8-slot GPU plan (`passages_pom_metatexture_14SEP26.md`) is **superseded as authoring interchange**. Keep Phase 0 (custom GLSL offscreen **passed**), UV-in-meters, unique-map compose, and silhouette POM. Do not start old P1 (R-codes / arrays) unless a painted override mask is needed later.
 
-**S1–S4** done. Openings (`kind=opening` or `depth_m>0`, not billboard): punch wall leftovers + 3D slab (`converter/opening.py`). Profiles rect/round/gothic. Next: **S5** POM niches.
+**S1–S5** done. Niches (`kind=niche`): height dip on unique maps + bake-time silhouette POM (`renderer/pom.py`). Wall not punched. Next: **S6** volume box + docs/demo style.
 
 ---
 

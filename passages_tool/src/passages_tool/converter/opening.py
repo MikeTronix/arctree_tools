@@ -15,6 +15,16 @@ _PUNCH_DIST_M = 0.25
 _MIN_SPAN = 0.02
 
 
+def is_niche(pl) -> bool:
+    """True when this arch is a POM recess (wall stays intact)."""
+    if getattr(pl, "type", None) != PolylineType.ARCH:
+        return False
+    if getattr(pl, "orientation", None) == "billboard":
+        return False
+    kind = getattr(pl, "kind", None) or None
+    return kind == "niche"
+
+
 def is_3d_opening(pl) -> bool:
     """True when this arch should punch the wall and extrude a slab."""
     if getattr(pl, "type", None) != PolylineType.ARCH:
@@ -183,12 +193,12 @@ def resolve_arch_span(
     return p_left, p_right, width, (nx, ny)
 
 
-def collect_opening_punches(level: Level) -> dict[tuple[str, int], list[WallHole]]:
-    """Map ``(wall_id, edge_start_vertex)`` → holes."""
+def _collect_arch_holes(level: Level, predicate) -> dict[tuple[str, int], list[WallHole]]:
+    """Map ``(wall_id, edge_start_vertex)`` → holes for arches matching ``predicate``."""
     out: dict[tuple[str, int], list[WallHole]] = {}
     wall_h = float(level.meta.wall_height)
     for pl in level.polylines.values():
-        if not is_3d_opening(pl):
+        if not predicate(pl):
             continue
         span = resolve_arch_span(level, pl)
         if span is None:
@@ -212,6 +222,16 @@ def collect_opening_punches(level: Level) -> dict[tuple[str, int], list[WallHole
                 hole = WallHole(t0=ts[0], t1=ts[1], z0=z0, z1=z1)
                 out.setdefault((wall.id, v0), []).append(hole)
     return out
+
+
+def collect_opening_punches(level: Level) -> dict[tuple[str, int], list[WallHole]]:
+    """Map ``(wall_id, edge_start_vertex)`` → 3D-opening holes."""
+    return _collect_arch_holes(level, is_3d_opening)
+
+
+def collect_niche_spans(level: Level) -> dict[tuple[str, int], list[WallHole]]:
+    """Map ``(wall_id, edge_start_vertex)`` → POM-niche spans (no punch)."""
+    return _collect_arch_holes(level, is_niche)
 
 
 def subtract_rect(keep: WallPatch, hole: WallPatch) -> list[WallPatch]:
