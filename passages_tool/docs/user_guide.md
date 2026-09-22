@@ -393,6 +393,13 @@ You are on a build older than the shared closing-edge helper. Update the tool.
 
 The file’s `"version"` is greater than 2. Update the tool, or only downgrade the field if you know the JSON is compatible.
 
+### Preview / bake through a doorway is a solid white rectangle
+
+The reverse still (`v1 → v0`) uses the same camera as the forward still. A white fill is the geometry in front of that camera, usually:
+
+- An **Opening** arch with **no door texture** — the 3D slab used to emit untextured (white) front/back cards that sealed the hole. Assign `big_door_b.png` (or similar) and **Alpha test**, or leave the texture empty so only the punched hole and jambs remain.
+- Looking through an alpha hole onto **empty space** — the bake buffer now clears to black (fog), so a missing back wall is a dark void instead of white. Add a closed wall behind the far eyepoint if you want a room there.
+
 ### Menu bar or Properties panel jumps after resize or File → Open
 
 The ImGui overlay lives on Panda’s `pixel2d` node. Resize and native file dialogs (Windows + tkinter) re-sync that node and ImGui’s `display_size` to the client size. If a build still drifts, resize the window once more; that forces the same path.

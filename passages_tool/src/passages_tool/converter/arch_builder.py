@@ -240,19 +240,21 @@ def _build_opening_slab(
         b0 = _world_on_span(p_left, p_right, width, nx, ny, s0, z0, -depth)
         b1 = _world_on_span(p_left, p_right, width, nx, ny, s1, z1, -depth)
         _add_quad(ctx, group, (f0, f1, b1, b0), side_tex, n_in)
-    # Front / back decorative cards (bounding rect)
-    fl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_bottom, 0.0)
-    fr = _world_on_span(p_left, p_right, width, nx, ny, width, z_bottom, 0.0)
-    ftr = _world_on_span(p_left, p_right, width, nx, ny, width, z_top, 0.0)
-    ftl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_top, 0.0)
-    poly_f = _add_quad(ctx, group, (fl, fr, ftr, ftl), front_tex, n_out)
-    poly_f.set_bface_flag(True)
-    bl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_bottom, -depth)
-    br = _world_on_span(p_left, p_right, width, nx, ny, width, z_bottom, -depth)
-    btr = _world_on_span(p_left, p_right, width, nx, ny, width, z_top, -depth)
-    btl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_top, -depth)
-    poly_b = _add_quad(ctx, group, (br, bl, btl, btr), front_tex, n_in)
-    poly_b.set_bface_flag(True)
+    # Front / back decorative cards (bounding rect). Skip when there is no
+    # door texture — untextured egg polys are opaque white and seal the hole.
+    if front_tex is not None:
+        fl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_bottom, 0.0)
+        fr = _world_on_span(p_left, p_right, width, nx, ny, width, z_bottom, 0.0)
+        ftr = _world_on_span(p_left, p_right, width, nx, ny, width, z_top, 0.0)
+        ftl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_top, 0.0)
+        poly_f = _add_quad(ctx, group, (fl, fr, ftr, ftl), front_tex, n_out)
+        poly_f.set_bface_flag(True)
+        bl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_bottom, -depth)
+        br = _world_on_span(p_left, p_right, width, nx, ny, width, z_bottom, -depth)
+        btr = _world_on_span(p_left, p_right, width, nx, ny, width, z_top, -depth)
+        btl = _world_on_span(p_left, p_right, width, nx, ny, 0.0, z_top, -depth)
+        poly_b = _add_quad(ctx, group, (br, bl, btl, btr), front_tex, n_in)
+        poly_b.set_bface_flag(True)
     if profile in ("round", "gothic"):
         # Spandrels: corner (0, z_top) / (width, z_top) to the upper profile.
         upper_z = [p[1] for p in pts if p[1] > z_bottom + 1e-4]

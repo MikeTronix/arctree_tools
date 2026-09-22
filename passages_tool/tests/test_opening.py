@@ -183,6 +183,16 @@ def test_opening_slab_has_inner_faces(tmp_path):
     assert len(polys) >= 6
 
 
+def test_opening_slab_omits_untextured_front_cards(tmp_path):
+    level, _w, arch = _opening_level()
+    arch.texture = None
+    groups = build_arches(level, texture_dir=tmp_path)
+    assert len(groups) == 1
+    polys = get_egg_polygons(groups[0])
+    # rect tunnel only (4 faces); no white bounding-rect cards
+    assert len(polys) == 4
+
+
 def test_card_arch_unchanged_without_kind(tmp_path):
     level = Level()
     pl = Polyline.make_arch((2.0, 3.0))

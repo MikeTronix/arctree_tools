@@ -77,6 +77,10 @@ class ViewpointRenderer:
         buffer = self.base.win.make_texture_buffer(buffer_name, render_w, render_h)
         if not buffer:
             return False
+        # Default buffer clear is white. A doorway whose alpha/punch opens onto
+        # empty space would otherwise fill with white instead of fog-black.
+        buffer.set_clear_color((0.0, 0.0, 0.0, 1.0))
+        buffer.set_clear_color_active(True)
 
         cam = self.base.make_camera(buffer)
         cam.reparent_to(self.scene_root)
