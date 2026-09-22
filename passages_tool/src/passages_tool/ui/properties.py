@@ -64,6 +64,14 @@ _IV_TINTS = [
 ]
 
 
+def outgoing_vertex_index(n: int, i: int, closed: bool) -> Optional[int]:
+    """Vertex after ``i``, or None when there is no outgoing edge to split."""
+    if n < 2 or i < 0 or i >= n:
+        return None
+    nxt = (i + 1) % n if closed else i + 1
+    return nxt if nxt < n else None
+
+
 class PropertiesPanel:
     def __init__(self, callbacks: Optional[dict[str, Callable]] = None) -> None:
         self._cb = callbacks or {}
@@ -164,47 +172,46 @@ class PropertiesPanel:
 
         opened, _ = imgui.begin("Properties",
                                 flags=no_move | no_resize | no_collapse)
-        if not opened:
+        try:
+            if not opened:
+                return
+
+            if polyline is None:
+                if level is not None:
+                    self._draw_level_meta(imgui, level, palette_sel)
+                else:
+                    imgui.text_colored((0.5, 0.5, 0.5, 1.0), "Nothing selected.")
+                return
+
+            # ── Type selector ─────────────────────────────────────────────────
+            self._draw_type_selector(imgui, polyline)
+            imgui.separator()
+
+            # ── ID line ───────────────────────────────────────────────────────
+            short_id = polyline.id[:18] + ("…" if len(polyline.id) > 18 else "")
+            imgui.text_disabled(f"ID: {short_id}")
+
+            # ── Type-specific body ────────────────────────────────────────────
+            t = polyline.type
+            if t == PolylineType.WALL:
+                self._draw_wall_props(imgui, polyline, palette_sel)
+            elif t == PolylineType.ARCH:
+                self._draw_arch_props(imgui, polyline, palette_sel, level)
+            elif t == PolylineType.EYEPATH:
+                self._draw_eyepath_props(imgui, polyline)
+            elif t == PolylineType.ANCHOR:
+                self._draw_anchor_props(imgui, polyline)
+
+            # ── Delete polyline (all types) ───────────────────────────────────
+            imgui.separator()
+            imgui.push_style_color(imgui.Col_.button.value, (0.7, 0.15, 0.15, 1.0))
+            if imgui.button("Delete polyline", (-1, 0)):
+                fn = self._cb.get("del_polyline")
+                if fn:
+                    fn(polyline.id)
+            imgui.pop_style_color()
+        finally:
             imgui.end()
-            return
-
-        if polyline is None:
-            if level is not None:
-                self._draw_level_meta(imgui, level, palette_sel)
-            else:
-                imgui.text_colored((0.5, 0.5, 0.5, 1.0), "Nothing selected.")
-            imgui.end()
-            return
-
-        # ── Type selector ─────────────────────────────────────────────────────
-        self._draw_type_selector(imgui, polyline)
-        imgui.separator()
-
-        # ── ID line ───────────────────────────────────────────────────────────
-        short_id = polyline.id[:18] + ("…" if len(polyline.id) > 18 else "")
-        imgui.text_disabled(f"ID: {short_id}")
-
-        # ── Type-specific body ────────────────────────────────────────────────
-        t = polyline.type
-        if t == PolylineType.WALL:
-            self._draw_wall_props(imgui, polyline, palette_sel)
-        elif t == PolylineType.ARCH:
-            self._draw_arch_props(imgui, polyline, palette_sel, level)
-        elif t == PolylineType.EYEPATH:
-            self._draw_eyepath_props(imgui, polyline)
-        elif t == PolylineType.ANCHOR:
-            self._draw_anchor_props(imgui, polyline)
-
-        # ── Delete polyline (all types) ───────────────────────────────────────
-        imgui.separator()
-        imgui.push_style_color(imgui.Col_.button.value, (0.7, 0.15, 0.15, 1.0))
-        if imgui.button("Delete polyline", (-1, 0)):
-            fn = self._cb.get("del_polyline")
-            if fn:
-                fn(polyline.id)
-        imgui.pop_style_color()
-
-        imgui.end()
 
     # ── Type selector ─────────────────────────────────────────────────────────
 
@@ -811,49 +818,51 @@ class PropertiesPanel:
 
         for i, (vx, vz) in enumerate(polyline.vertices):
             imgui.push_id(i)
-
-            # If the polyline is an eyepath, make the vertex select-clickable
-            if polyline.type == PolylineType.EYEPATH:
-                is_selected = (self._selected_vertex_idx == i)
-                if is_selected:
-                    imgui.push_style_color(imgui.Col_.button.value, (0.2, 0.7, 0.3, 1.0))
-                if imgui.small_button(f"[{i}]##sel"):
-                    self._selected_vertex_idx = i
-                    self._preview_image_ref = None
-                if is_selected:
-                    imgui.pop_style_color()
-            else:
-                imgui.text(f"[{i}]")
-            imgui.same_line()
-            imgui.set_next_item_width(self._px(85))
-            cx, nx = imgui.input_float(f"x##{i}", vx, format="%.2f")
-            imgui.same_line()
-            imgui.set_next_item_width(self._px(85))
-            cz, nz = imgui.input_float(f"y##{i}", vz, format="%.2f")
-
-            if cx or cz:
-                fn = self._cb.get("move_vertex")
-                if fn:
-                    fn(polyline.id, i,
-                       nx if cx else vx,
-                       nz if cz else vz)
-
-            imgui.same_line()
-            if imgui.button("X"):
-                to_delete = i
-
-            # Insert a vertex on the edge leaving this one (midpoint), then the
-            # artist drags it into place. Wraps for closed polygons; skipped on
-            # the last vertex of an open polyline (no edge to split).
-            n = len(polyline.vertices)
-            nxt = (i + 1) % n if polyline.closed else i + 1
-            if nxt < n:
+            try:
+                # If the polyline is an eyepath, make the vertex select-clickable
+                if polyline.type == PolylineType.EYEPATH:
+                    is_selected = (self._selected_vertex_idx == i)
+                    if is_selected:
+                        imgui.push_style_color(imgui.Col_.button.value, (0.2, 0.7, 0.3, 1.0))
+                    if imgui.small_button(f"[{i}]##sel"):
+                        self._selected_vertex_idx = i
+                        self._preview_image_ref = None
+                    if is_selected:
+                        imgui.pop_style_color()
+                else:
+                    imgui.text(f"[{i}]")
                 imgui.same_line()
-                if imgui.button("Ins"):
-                    nvx, nvz = polyline.vertices[nxt]
-                    to_insert = (i, (vx + nvx) / 2.0, (vz + nvz) / 2.0)
+                imgui.set_next_item_width(self._px(85))
+                cx, nx = imgui.input_float(f"x##{i}", vx, format="%.2f")
+                imgui.same_line()
+                imgui.set_next_item_width(self._px(85))
+                cz, nz = imgui.input_float(f"y##{i}", vz, format="%.2f")
 
-            imgui.pop_id()
+                if cx or cz:
+                    fn = self._cb.get("move_vertex")
+                    if fn:
+                        fn(polyline.id, i,
+                           nx if cx else vx,
+                           nz if cz else vz)
+
+                imgui.same_line()
+                if imgui.button("X"):
+                    to_delete = i
+
+                # Insert a vertex on the edge leaving this one (midpoint).
+                # Wraps for closed walls; last vertex of an open chain (EyePath)
+                # has no outgoing edge.
+                n = len(polyline.vertices)
+                nxt = outgoing_vertex_index(
+                    n, i, bool(getattr(polyline, "closed", False)),
+                )
+                if nxt is not None:
+                    imgui.same_line()
+                    if imgui.button("Ins"):
+                        nvx, nvz = polyline.vertices[nxt]
+                        to_insert = (i, (vx + nvx) / 2.0, (vz + nvz) / 2.0)
+            finally:
+                imgui.pop_id()
 
         if to_delete is not None:
             fn = self._cb.get("del_vertex")

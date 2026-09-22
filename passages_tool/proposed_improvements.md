@@ -69,6 +69,7 @@ Do not re-derive these; extend them.
 | Editor state | `editor_state.json` (gitignored, tool root) | Remembers last texture directory and `ui_scale`. First launch scans `assets/sample_textures` if present. Texture scan is recursive (`relative/posix` names). |
 | `clamp_ui_scale` / `resolve_ui_scale` / `apply_imgui_ui_scale` | `ui/scale.py` | Feature 12 overlay scale. imgui-bundle 1.92 uses `style.font_scale_main` (not `io.font_global_scale`) plus relative `style.scale_all_sizes`. Viewport world units stay 1:1. |
 | `overlay_layout` / `pixel2d_scale` | `ui/scale.py` | Side-panel pos/size from display size + real menu-bar height. `pixel2d_scale` is `2/w, 1, 2/h` so ImGui stays 1 unit = 1 pixel after resize. |
+| `outgoing_vertex_index` | `ui/properties.py` | Insert-after index for the vertex list. Only `Wall` has `closed`; EyePath/Arch/Anchor are open chains (`getattr(..., "closed", False)`). |
 
 Dirty tracking: `PassagesApp._saved_snapshot` + `_capture_saved` / `_refresh_dirty`. Do not trust `Level.from_dict().dirty` after undo.
 
