@@ -41,6 +41,7 @@ from passages_tool.ui.properties import PropertiesPanel
 from passages_tool.ui.scale import (
     apply_imgui_ui_scale,
     clamp_ui_scale,
+    pixel2d_scale,
     resolve_ui_scale,
     scaled_px,
 )
@@ -92,9 +93,10 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
         self._restore_texture_dir(editor_state)
 
         self._rebuild_grid()
-        self._refresh_title()
-
+        self._window_title = ""
+        self._title_needs_apply = False
         self._imgui_active = False
+        self._refresh_title()
         self._init_imgui()
 
         self._toolbar = Toolbar(callbacks={
@@ -181,7 +183,7 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
         """Draw all ImGui panels (runs at task sort=10)."""
         try:
             sel_pl = self._get_selected_polyline()
-            self._toolbar.draw(
+            bar_h = self._toolbar.draw(
                 current_tool = self._tool,
                 can_undo     = self._history.can_undo(),
                 can_redo     = self._history.can_redo(),
@@ -190,9 +192,11 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
                 snap_grid    = self._level.meta.snap_grid,
                 ui_scale     = self._ui_scale,
             )
-            self._palette.draw(self._ui_scale)
-            self._props.draw(sel_pl, self._palette.selected_name, self._level, self._ui_scale)
-            self._refresh_title()
+            self._palette.draw(self._ui_scale, menu_bar_h=bar_h)
+            self._props.draw(
+                sel_pl, self._palette.selected_name, self._level, self._ui_scale,
+                menu_bar_h=bar_h,
+            )
 
             if self._arch_snap_pending:
                 from imgui_bundle import imgui
@@ -248,21 +252,71 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
         self._grid.rebuild(fw, fh, cx, cz, cell=self._level.meta.snap_grid)
 
     def _on_window_event(self, window) -> None:
+        # ShowBase.windowEvent rescales pixel2d (ImGui's parent). accept() on
+        # this ShowBase subclass replaces that handler, so call it explicitly.
+        self.windowEvent(window)
         if window != self.win:
             return
-        props = window.getProperties()
-        w, h = int(props.getXSize()), int(props.getYSize())
+        self._resync_window()
+
+    def _window_client_size(self) -> tuple[int, int]:
+        if self.win is None:
+            return (WINDOW_W, WINDOW_H)
+        props = self.win.getProperties()
+        return int(props.getXSize()), int(props.getYSize())
+
+    def _sync_pixel2d(self) -> None:
+        """Keep 1 pixel2d unit = 1 framebuffer pixel after resize / native dialogs."""
+        if not hasattr(self, "pixel2d"):
+            return
+        w, h = self._window_client_size()
+        if w < 2 or h < 2:
+            return
+        sx, sy, sz = pixel2d_scale(w, h)
+        self.pixel2d.setScale(sx, sy, sz)
+
+    def _sync_imgui_display_size(self) -> None:
+        """Keep ImGui display_size equal to the Panda window (resize + post-dialog)."""
+        if not self._imgui_active:
+            return
+        w, h = self._window_client_size()
+        if w < 2 or h < 2:
+            return
+        try:
+            from imgui_bundle import imgui
+
+            io = imgui.get_io()
+            if abs(io.display_size.x - w) > 0.5 or abs(io.display_size.y - h) > 0.5:
+                io.display_size = (float(w), float(h))
+        except Exception:
+            pass
+
+    def _resync_window(self) -> None:
+        w, h = self._window_client_size()
         if w > 1 and h > 1:
             self._cam.on_resize(w, h)
             self._rebuild_grid()
+        self._sync_pixel2d()
+        self._sync_imgui_display_size()
 
     def _refresh_title(self) -> None:
-        if self.win is None:
-            return
+        """Queue the title string. Applied outside the ImGui draw task."""
         name = self._file_path.name if self._file_path else "Untitled"
         dirty = " *" if self._level.dirty else ""
+        title = f"{WINDOW_TITLE} — {name}{dirty}"
+        if getattr(self, "_window_title", None) == title:
+            return
+        self._window_title = title
+        self._title_needs_apply = True
+        if not self._imgui_active:
+            self._apply_window_title()
+
+    def _apply_window_title(self) -> None:
+        if not getattr(self, "_title_needs_apply", False) or self.win is None:
+            return
+        self._title_needs_apply = False
         props = WindowProperties()
-        props.setTitle(f"{WINDOW_TITLE} — {name}{dirty}")
+        props.setTitle(self._window_title)
         self.win.requestProperties(props)
 
     def _focus_polyline(self, pid: str) -> None:
@@ -326,6 +380,10 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
             pass
 
     def _ui_scale_task(self, task):
+        self._refresh_title()
+        self._apply_window_title()
+        self._sync_pixel2d()
+        self._sync_imgui_display_size()
         self._apply_imgui_ui_scale()
         return task.cont
 

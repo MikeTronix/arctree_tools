@@ -10,6 +10,8 @@ import sys
 from typing import Any, Optional
 
 from passages_tool.config import (
+    PALETTE_PANEL_W,
+    PROPS_PANEL_W,
     UI_SCALE_MAX,
     UI_SCALE_MIN,
     UI_SCALE_PRESETS,
@@ -107,3 +109,39 @@ def overlay_top_px(imgui: Any, scale: float) -> float:
 
 def scaled_px(base: float, scale: float) -> float:
     return float(base) * clamp_ui_scale(scale)
+
+
+def overlay_layout(
+    display_w: float,
+    display_h: float,
+    ui_scale: float,
+    menu_bar_h: float,
+) -> tuple[float, float, float, float]:
+    """Menu-bar height, palette width, properties width, side-panel height.
+
+    Side panels keep their scaled width until they would overflow the window.
+    """
+    dw = max(1.0, float(display_w))
+    dh = max(1.0, float(display_h))
+    scale = clamp_ui_scale(ui_scale)
+    if float(menu_bar_h) > 1.0:
+        bar_h = float(menu_bar_h)
+    else:
+        bar_h = 20.0 * scale
+    pal = scaled_px(PALETTE_PANEL_W, scale)
+    props = scaled_px(PROPS_PANEL_W, scale)
+    budget = max(1.0, dw * 0.85)
+    total = pal + props
+    if total > budget:
+        f = budget / total
+        pal *= f
+        props *= f
+    panel_h = max(64.0, dh - bar_h)
+    return bar_h, pal, props, panel_h
+
+
+def pixel2d_scale(win_w: int, win_h: int) -> tuple[float, float, float]:
+    """Panda ``pixel2d`` scale so 1 unit is 1 framebuffer pixel."""
+    w = max(1, int(win_w))
+    h = max(1, int(win_h))
+    return (2.0 / w, 1.0, 2.0 / h)

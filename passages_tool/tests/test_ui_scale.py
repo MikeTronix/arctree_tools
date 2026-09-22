@@ -5,6 +5,8 @@ from passages_tool.ui.scale import (
     apply_imgui_ui_scale,
     clamp_ui_scale,
     detect_os_ui_scale,
+    overlay_layout,
+    pixel2d_scale,
     resolve_ui_scale,
     scaled_px,
     snap_ui_scale_preset,
@@ -81,3 +83,24 @@ def test_scaled_px():
     assert scaled_px(300, 1.0) == 300
     assert scaled_px(300, 2.0) == 600
     assert scaled_px(20, 0.0) == 20  # clamped to 1.0
+
+
+def test_overlay_layout_keeps_scaled_widths_until_overflow():
+    bar, pal, props, ph = overlay_layout(1440, 900, 1.5, 28.0)
+    assert bar == 28.0
+    assert pal == 450.0
+    assert props == 480.0
+    assert ph == 872.0
+    bar2, pal2, props2, ph2 = overlay_layout(400, 300, 2.0, 40.0)
+    assert pal2 + props2 <= 400 * 0.85 + 1e-6
+    assert ph2 == 260.0
+
+
+def test_pixel2d_scale_is_two_over_size():
+    sx, sy, sz = pixel2d_scale(1440, 900)
+    assert abs(sx - 2.0 / 1440) < 1e-12
+    assert sy == 1.0
+    assert abs(sz - 2.0 / 900) < 1e-12
+    sx2, _, sz2 = pixel2d_scale(0, 0)
+    assert sx2 == 2.0
+    assert sz2 == 2.0

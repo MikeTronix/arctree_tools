@@ -68,6 +68,7 @@ Do not re-derive these; extend them.
 | `BackgroundGrid.rebuild(..., cell=)` | `viewport/grid.py` | Minor spacing from `meta.snap_grid`; doubles `cell` if more than ~240 lines would be drawn. `Level.grid.cell_size` is still serialized and unused. |
 | Editor state | `editor_state.json` (gitignored, tool root) | Remembers last texture directory and `ui_scale`. First launch scans `assets/sample_textures` if present. Texture scan is recursive (`relative/posix` names). |
 | `clamp_ui_scale` / `resolve_ui_scale` / `apply_imgui_ui_scale` | `ui/scale.py` | Feature 12 overlay scale. imgui-bundle 1.92 uses `style.font_scale_main` (not `io.font_global_scale`) plus relative `style.scale_all_sizes`. Viewport world units stay 1:1. |
+| `overlay_layout` / `pixel2d_scale` | `ui/scale.py` | Side-panel pos/size from display size + real menu-bar height. `pixel2d_scale` is `2/w, 1, 2/h` so ImGui stays 1 unit = 1 pixel after resize. |
 
 Dirty tracking: `PassagesApp._saved_snapshot` + `_capture_saved` / `_refresh_dirty`. Do not trust `Level.from_dict().dirty` after undo.
 
@@ -143,7 +144,7 @@ Viewport uses `meta.snap_grid`. On save, `grid.cell_size` is written as `snap_gr
 
 ### 3.5 Window resize — **done**
 
-`window-event` → `ViewportCamera.on_resize` + grid. Offscreen preview windows are ignored.
+`window-event` forwards to `ShowBase.windowEvent` (pixel2d / close / minimize) then `ViewportCamera.on_resize` + grid + ImGui `display_size`. `_resync_window` also runs after tkinter file/message dialogs so Open does not leave the Properties panel and menu bar at the old client size. Offscreen preview windows are ignored.
 
 ### 3.6 History too coarse for sliders — **done** (coalesce, not ImGui activate)
 

@@ -126,7 +126,7 @@ That writes `scene_out/` (component `.egg` files), `renders_out/` (PNG viewpoint
 | **Viewport** (centre) | XZ plan of the level |
 | **Properties** (right) | Selected polyline, plus level-wide meta when nothing (or anything) is selected |
 
-Window title: `Passages Level Editor — <filename> *` (`*` = unsaved).
+Window title: `Passages Level Editor — <filename> *` (`*` = unsaved). The side panels keep their scaled width when you resize the window; they shrink together only if both would no longer fit. File → Open (and other native dialogs) re-sync the overlay to the client size so the Properties panel and menu bar stay aligned.
 
 ---
 
@@ -392,6 +392,10 @@ You are on a build older than the shared closing-edge helper. Update the tool.
 ### Level version newer than this tool
 
 The file’s `"version"` is greater than 2. Update the tool, or only downgrade the field if you know the JSON is compatible.
+
+### Menu bar or Properties panel jumps after resize or File → Open
+
+The ImGui overlay lives on Panda’s `pixel2d` node. Resize and native file dialogs (Windows + tkinter) re-sync that node and ImGui’s `display_size` to the client size. If a build still drifts, resize the window once more; that forces the same path.
 
 ### Sprites do not line up with baked backgrounds
 

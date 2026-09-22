@@ -36,12 +36,14 @@ class CommandsMixin:
             filetypes=[("Passages Level", "*.passages.json"), ("All files", "*.*")],
             parent=self._tk_root,
         )
+        self._resync_window()
         if not path:
             return
         try:
             new_level = load(path)
         except LevelIOError as e:
             messagebox.showerror("Open Error", str(e), parent=self._tk_root)
+            self._resync_window()
             return
         self._level = new_level
         self._pm.level = self._level
@@ -64,6 +66,7 @@ class CommandsMixin:
             self._capture_saved()
         except LevelIOError as e:
             messagebox.showerror("Save Error", str(e), parent=self._tk_root)
+            self._resync_window()
 
     def _cmd_save_as(self) -> None:
         path = filedialog.asksaveasfilename(
@@ -72,6 +75,7 @@ class CommandsMixin:
             filetypes=[("Passages Level", "*.passages.json"), ("All files", "*.*")],
             parent=self._tk_root,
         )
+        self._resync_window()
         if not path:
             return
         self._file_path = Path(path)
@@ -82,6 +86,7 @@ class CommandsMixin:
             title="Select Texture Folder",
             parent=self._tk_root,
         )
+        self._resync_window()
         if directory:
             self._tex.scan_directory(directory)
             self._save_editor_state()
@@ -157,7 +162,9 @@ class CommandsMixin:
             "Vertices/intervals/edges that the new type does not use will be dropped.",
             parent=self._tk_root,
         ):
+            self._resync_window()
             return
+        self._resync_window()
         self._hist()
         self._level.replace_polyline(convert_polyline_type(pl, new_type))
         self._pm.rebuild_one(pid)
@@ -262,10 +269,12 @@ class CommandsMixin:
         self.userExit()
 
     def _confirm_discard(self) -> bool:
-        return messagebox.askyesno(
+        ok = messagebox.askyesno(
             "Unsaved Changes",
             "The current level has unsaved changes.\nDiscard and continue?",
             parent=self._tk_root,
         )
+        self._resync_window()
+        return ok
 
 

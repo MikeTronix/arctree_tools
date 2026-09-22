@@ -24,9 +24,9 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from passages_tool.config import PALETTE_PANEL_W, THUMBNAIL_DISPLAY_SIZE, THUMBNAIL_H, THUMBNAIL_W
+from passages_tool.config import THUMBNAIL_DISPLAY_SIZE, THUMBNAIL_H, THUMBNAIL_W
 from passages_tool.textures.manager import TextureManager
-from passages_tool.ui.scale import overlay_top_px, scaled_px
+from passages_tool.ui.scale import overlay_layout, overlay_top_px, scaled_px
 
 
 class TexturePalette:
@@ -49,7 +49,7 @@ class TexturePalette:
     def select(self, name: Optional[str]) -> None:
         self._selected = name
 
-    def draw(self, ui_scale: float = 1.0) -> None:
+    def draw(self, ui_scale: float = 1.0, menu_bar_h: float = 0.0) -> None:
         """Render the palette panel. Must be called inside an imgui frame."""
         try:
             from imgui_bundle import imgui
@@ -57,10 +57,12 @@ class TexturePalette:
             return
 
         # ── Panel position and size ────────────────────────────────────────────
+        display_w = imgui.get_io().display_size.x
         display_h = imgui.get_io().display_size.y
-        bar_h     = overlay_top_px(imgui, ui_scale)
-        panel_w   = scaled_px(PALETTE_PANEL_W, ui_scale)
-        panel_h   = display_h - bar_h
+        bar_guess = menu_bar_h if menu_bar_h > 1.0 else overlay_top_px(imgui, ui_scale)
+        bar_h, panel_w, _props_w, panel_h = overlay_layout(
+            display_w, display_h, ui_scale, bar_guess
+        )
 
         # Cond_.always so position sticks even if imgui.ini saved something bad.
         always     = imgui.Cond_.always.value

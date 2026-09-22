@@ -51,15 +51,15 @@ class Toolbar:
         snap_enabled: bool,
         snap_grid: float,
         ui_scale: float = 1.0,
-    ) -> None:
-        """Render the top menu bar. Must be called inside an imgui frame."""
+    ) -> float:
+        """Render the top menu bar. Returns its height in pixels (0 if skipped)."""
         try:
             from imgui_bundle import imgui
         except ImportError:
-            return
+            return 0.0
 
         if not imgui.begin_main_menu_bar():
-            return
+            return 0.0
 
         # ── File menu ─────────────────────────────────────────────────────────
         if imgui.begin_menu("File"):
@@ -168,7 +168,11 @@ class Toolbar:
         fps_text = f"{fps:.0f} fps"
         fps_w    = imgui.calc_text_size(fps_text).x
         bar_w    = imgui.get_io().display_size.x
-        imgui.set_cursor_pos_x(bar_w - fps_w - 8 * ui_scale)
+        fps_x    = bar_w - fps_w - 8 * ui_scale
+        if fps_x > imgui.get_cursor_pos_x() + 8:
+            imgui.set_cursor_pos_x(fps_x)
         imgui.text_disabled(fps_text)
 
+        bar_h = float(imgui.get_window_size().y)
         imgui.end_main_menu_bar()
+        return bar_h

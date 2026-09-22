@@ -39,10 +39,9 @@ from typing import Callable, Optional
 
 from passages_tool.config import (
     INTERVAL_COLORS,
-    PROPS_PANEL_W,
 )
 from passages_tool.editor.level import Level, Polyline, PolylineType
-from passages_tool.ui.scale import overlay_top_px, scaled_px
+from passages_tool.ui.scale import overlay_layout, overlay_top_px, scaled_px
 
 
 _TYPE_LABELS = ["Wall", "Arch", "EyePath", "Anchor"]
@@ -131,6 +130,7 @@ class PropertiesPanel:
         palette_sel: Optional[str],
         level:       Optional[Level] = None,
         ui_scale:    float = 1.0,
+        menu_bar_h:  float = 0.0,
     ) -> None:
         """Render the properties panel. Must be called inside an imgui frame."""
         try:
@@ -149,9 +149,10 @@ class PropertiesPanel:
 
         display_w = imgui.get_io().display_size.x
         display_h = imgui.get_io().display_size.y
-        bar_h     = overlay_top_px(imgui, ui_scale)
-        panel_w   = self._px(PROPS_PANEL_W)
-        panel_h   = display_h - bar_h
+        bar_guess = menu_bar_h if menu_bar_h > 1.0 else overlay_top_px(imgui, ui_scale)
+        bar_h, _pal_w, panel_w, panel_h = overlay_layout(
+            display_w, display_h, ui_scale, bar_guess
+        )
 
         always      = imgui.Cond_.always.value
         no_move     = imgui.WindowFlags_.no_move.value
