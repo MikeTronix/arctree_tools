@@ -184,6 +184,11 @@ class CommandsMixin:
         self._level.set_interval_texture(pid, idx, tex)
         self._pm.rebuild_one(pid)
 
+    def _cb_clear_wall_png_overrides(self, pid: str) -> None:
+        self._hist()
+        self._level.clear_wall_png_overrides(pid)
+        self._pm.rebuild_one(pid)
+
     def _cb_set_interval_x_offset(
             self, pid: str, idx: int, x: float) -> None:
         self._hist(f"ivoff:{pid}:{idx}")

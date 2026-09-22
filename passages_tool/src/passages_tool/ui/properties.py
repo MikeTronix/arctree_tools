@@ -26,6 +26,7 @@ Callbacks (caller must supply in the dict passed to __init__)
   del_polyline(pid)
   -- Phase 3 additions --
   set_interval_texture(pid, idx, tex|None)
+  clear_wall_png_overrides(pid)
   set_interval_x_offset(pid, idx, float)
   add_texture_interval(pid, from_v, to_v)
   remove_texture_interval(pid, idx)
@@ -194,7 +195,7 @@ class PropertiesPanel:
             # ── Type-specific body ────────────────────────────────────────────
             t = polyline.type
             if t == PolylineType.WALL:
-                self._draw_wall_props(imgui, polyline, palette_sel)
+                self._draw_wall_props(imgui, polyline, palette_sel, level)
             elif t == PolylineType.ARCH:
                 self._draw_arch_props(imgui, polyline, palette_sel, level)
             elif t == PolylineType.EYEPATH:
@@ -231,6 +232,7 @@ class PropertiesPanel:
 
     def _draw_wall_props(
         self, imgui, polyline: Polyline, palette_sel: Optional[str],
+        level: Optional[Level] = None,
     ) -> None:
         imgui.text(f"Vertices: {len(polyline.vertices)}")
 
@@ -242,8 +244,28 @@ class PropertiesPanel:
 
         imgui.separator()
 
+        style_id = ""
+        if level is not None:
+            style_id = (getattr(level.meta, "style", None) or "").strip()
+        if style_id:
+            imgui.text_colored((0.9, 0.8, 0.2, 1.0), "Style dressing")
+            imgui.text_wrapped(
+                f"Level style '{style_id}' paints bands and overlays on edges "
+                "without a PNG. Unique maps show in 3D preview / bake."
+            )
+            n_png = sum(1 for iv in polyline.texture_intervals if iv.texture)
+            if n_png:
+                if imgui.button("Use style on this wall"):
+                    fn = self._cb.get("clear_wall_png_overrides")
+                    if fn:
+                        fn(polyline.id)
+                imgui.text_disabled(f"{n_png} PNG interval(s) override the style.")
+            else:
+                imgui.text_disabled("This wall uses the level style.")
+            imgui.separator()
+
         # ── Texture intervals ─────────────────────────────────────────────────
-        self._draw_interval_editor(imgui, polyline, palette_sel)
+        self._draw_interval_editor(imgui, polyline, palette_sel, style_id=style_id)
 
         imgui.separator()
 
@@ -253,8 +275,10 @@ class PropertiesPanel:
 
     def _draw_interval_editor(
         self, imgui, polyline: Polyline, palette_sel: Optional[str],
+        style_id: str = "",
     ) -> None:
-        imgui.text_colored((0.9, 0.8, 0.2, 1.0), "Texture Intervals")
+        heading = "PNG overrides" if style_id else "Texture Intervals"
+        imgui.text_colored((0.9, 0.8, 0.2, 1.0), heading)
 
         n_verts = len(polyline.vertices)
         max_v   = max(0, n_verts - 1)
@@ -274,7 +298,12 @@ class PropertiesPanel:
             imgui.text(f"V{iv.from_vertex}–{iv.to_vertex}")
 
             # Texture display + assign/clear
-            tex_label = (iv.texture or "(none)")
+            if iv.texture:
+                tex_label = iv.texture
+            elif style_id:
+                tex_label = "(style)"
+            else:
+                tex_label = "(none)"
             imgui.same_line()
             imgui.text_disabled(tex_label[-14:] if len(tex_label) > 14 else tex_label)
 

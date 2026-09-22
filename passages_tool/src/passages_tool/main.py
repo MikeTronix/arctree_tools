@@ -126,6 +126,7 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
             "insert_vertex":           self._cb_insert_vertex,
             "del_polyline":            self._cb_del_polyline,
             "set_interval_texture":    self._cb_set_interval_texture,
+            "clear_wall_png_overrides": self._cb_clear_wall_png_overrides,
             "set_interval_x_offset":   self._cb_set_interval_x_offset,
             "add_texture_interval":    self._cb_add_texture_interval,
             "remove_texture_interval": self._cb_remove_texture_interval,

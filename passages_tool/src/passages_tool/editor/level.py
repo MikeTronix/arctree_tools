@@ -402,6 +402,19 @@ class Level:
             pl.texture_intervals[index].texture = texture
             self.dirty = True
 
+    def clear_wall_png_overrides(self, polyline_id: str) -> None:
+        """Drop PNG filenames on every interval so a level style can dress the wall."""
+        pl = self.polylines.get(polyline_id)
+        if not isinstance(pl, Wall):
+            return
+        changed = False
+        for iv in pl.texture_intervals:
+            if iv.texture:
+                iv.texture = None
+                changed = True
+        if changed:
+            self.dirty = True
+
     def set_interval_x_offset(self, polyline_id: str,
                               index: int, x_offset: float) -> None:
         """Update the x_offset on an existing interval (by index)."""

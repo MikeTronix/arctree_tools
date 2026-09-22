@@ -170,8 +170,9 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 1. `W`, left-click vertices, Enter/RMB to finish.
 2. Closed walls: tick **Closed** in Properties (closing edge is textured by an interval that reaches the last vertex).
-3. Texture with **intervals** (from-vertex → to-vertex, texture, x-offset). Overlapping intervals are rejected.
-4. **Ins** on a vertex row inserts a midpoint after that vertex.
+3. On a styled level (Level Properties → **Style**), walls use that pack’s bands and overlays. Select the wall and **Use style on this wall** to drop PNG interval filenames. A PNG on an interval is an override (old UV path). Unique maps show in 3D preview / bake, not on the 2D plan.
+4. Texture with **intervals** (from-vertex → to-vertex, texture, x-offset) when you want a PNG override. Overlapping intervals are rejected.
+5. **Ins** on a vertex row inserts a midpoint after that vertex.
 
 ### Arches
 
@@ -211,7 +212,7 @@ Names are paths relative to the folder (`base/brick.png` if nested). Folders nam
 
 ### Style packs (optional)
 
-A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Pick it in Level Properties → **Style** (or set `"style"` in the JSON). Untextured wall edges then get **band-composed** unique maps in **meters** (rooms need not match PNG size). An interval **with** a PNG is an override (old UV path). Floor/ceiling assignment is unchanged.
+A style is `styles/<id>.json` plus `presets/<name>/diffuse.png` in **this same texture folder**. Pick it in Level Properties → **Style** (click empty space so Properties shows the level). Untextured wall edges then get **band-composed** unique maps in **meters**. Existing levels often have a PNG on every interval — select each wall and **Use style on this wall**. Floor/ceiling assignment is unchanged.
 
 On a **fixed** Arch, **Properties → Dressing → Kind**: Opening (3D slab + punch), Niche (POM dip, needs style), Volume (pilaster into the room), Recess (walk-in box into the wall). Style `"loop_u"` continues tiling around corners (default true). Ceiling combo **None** skips the roof; style `"beams"` hang under the ceiling. Demo: `json/style_demo.passages.json`.
 

@@ -77,6 +77,19 @@ class TestSetIntervalTexture:
         # Should not raise
         level.set_interval_texture("ghost-pid", 0, "stone.png")
 
+    def test_clear_wall_png_overrides(self):
+        level, pl = _wall_with_verts(5)
+        level.add_texture_interval(pl.id, TextureInterval(0, 2, texture="a.png"))
+        level.add_texture_interval(pl.id, TextureInterval(2, 4, texture="b.png"))
+        level.dirty = False
+        level.clear_wall_png_overrides(pl.id)
+        assert pl.texture_intervals[0].texture is None
+        assert pl.texture_intervals[1].texture is None
+        assert level.dirty
+        level.dirty = False
+        level.clear_wall_png_overrides(pl.id)
+        assert level.dirty is False
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  set_interval_x_offset
