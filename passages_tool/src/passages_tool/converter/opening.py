@@ -35,6 +35,25 @@ def is_volume(pl) -> bool:
     return kind == "volume"
 
 
+def apply_volume_kind_defaults(pl) -> None:
+    """Pilaster size when Kind becomes Volume (Place Arch is still a 4 m door)."""
+    from passages_tool.config import (
+        VOLUME_DEFAULT_DEPTH_M,
+        VOLUME_DEFAULT_WIDTH_M,
+        VOLUME_DOOR_WIDTH_M,
+    )
+
+    if getattr(pl, "type", None) != PolylineType.ARCH:
+        return
+    if float(getattr(pl, "width", 0.0) or 0.0) >= VOLUME_DOOR_WIDTH_M:
+        pl.width = VOLUME_DEFAULT_WIDTH_M
+    if getattr(pl, "auto_snap", False):
+        pl.auto_snap = False
+    d = getattr(pl, "depth_m", None)
+    if d is None or float(d) <= 0.0:
+        pl.depth_m = VOLUME_DEFAULT_DEPTH_M
+
+
 def is_niche(pl) -> bool:
     """True when this arch is a POM recess (wall stays intact)."""
     if getattr(pl, "type", None) != PolylineType.ARCH:

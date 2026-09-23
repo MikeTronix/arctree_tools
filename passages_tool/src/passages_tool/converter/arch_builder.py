@@ -330,7 +330,11 @@ def build_arches(
                 egg_tex.set_alpha_mode(EggTexture.AM_off)
 
         is_billboard = (pl.orientation == "billboard")
-        auto_snap = getattr(pl, "auto_snap", False) and not is_billboard
+        auto_snap = (
+            getattr(pl, "auto_snap", False)
+            and not is_billboard
+            and not is_volume(pl)
+        )
         
         # Solve endpoints and orientation
         if auto_snap:

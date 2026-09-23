@@ -190,6 +190,10 @@ class CommandsMixin:
         pl = self._level.get_polyline(pid)
         if pl and hasattr(pl, field):
             setattr(pl, field, value)
+            if field == "kind" and value == "volume":
+                from passages_tool.converter.opening import apply_volume_kind_defaults
+
+                apply_volume_kind_defaults(pl)
             self._level.dirty = True
         self._pm.rebuild_one(pid)
 

@@ -233,6 +233,8 @@ class PolylineNode:
 
         is_billboard = (self._data.orientation == "billboard")
         auto_snap = getattr(self._data, "auto_snap", False) and not is_billboard and level is not None
+        if getattr(self._data, "kind", None) == "volume":
+            auto_snap = False
 
         if auto_snap:
             try:
@@ -286,6 +288,18 @@ class PolylineNode:
                 for ex, ez in ((px - dx, pz - dz), (px + dx, pz + dz)):
                     segs.moveTo(ex - pdx, 0, ez - pdz)
                     segs.drawTo(ex + pdx, 0, ez + pdz)
+
+                if getattr(self._data, "kind", None) == "volume":
+                    depth = float(getattr(self._data, "depth_m", None) or 0.45)
+                    nx = math.cos(math.radians(float(self._data.orientation)))
+                    nz = math.sin(math.radians(float(self._data.orientation)))
+                    lx, lz = px - dx, pz - dz
+                    rx, rz = px + dx, pz + dz
+                    ox, oz = nx * depth, nz * depth
+                    segs.moveTo(lx, 0, lz)
+                    segs.drawTo(lx + ox, 0, lz + oz)
+                    segs.drawTo(rx + ox, 0, rz + oz)
+                    segs.drawTo(rx, 0, rz)
 
         np = self._geo_np.attachNewNode(segs.create(dynamic=True))
         np.setBin("opaque", 1)

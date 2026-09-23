@@ -590,7 +590,9 @@ class PropertiesPanel:
             if kind == "niche":
                 imgui.text_disabled("Needs a style pack (unique wall maps + POM).")
             if kind == "volume":
-                imgui.text_disabled("Keep width modest (not the 4 m door default).")
+                imgui.text_disabled(
+                    "Pilaster into the room. Door-sized width shrinks to 0.55 m."
+                )
 
         imgui.separator()
 

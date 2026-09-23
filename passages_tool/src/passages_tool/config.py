@@ -116,6 +116,12 @@ UI_SCALE_MAX: float = 2.0
 # THUMBNAIL_W x THUMBNAIL_H; this is the displayed size per cell).
 THUMBNAIL_DISPLAY_SIZE: int = 88
 
+# Arch kind=volume (pilaster). Place Arch still defaults to a 4 m door;
+# switching to Volume shrinks door-sized widths down to these.
+VOLUME_DEFAULT_WIDTH_M: float = 0.55
+VOLUME_DEFAULT_DEPTH_M: float = 0.45
+VOLUME_DOOR_WIDTH_M: float = 2.5
+
 # ── Level file ────────────────────────────────────────────────────────────────
 
 LEVEL_FILE_VERSION: int = 2

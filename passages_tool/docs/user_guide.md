@@ -178,7 +178,7 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 One click. If you place near a wall, the tool offers a perpendicular snap: **Enter** accepts, **Esc** or another click / tool switch keeps **billboard**.
 
-**Dressing** (fixed angle, not billboard): Kind combo — Card, Opening, Niche, Volume, Recess. Opening/Recess show Profile and Depth; Volume/Opening/Recess can Assign a side texture from the palette. Niche needs a style pack. Billboard stays a card.
+**Dressing** (fixed angle, not billboard): Kind combo — Card, Opening, Niche, Volume, Recess. Opening/Recess show Profile and Depth; Volume/Opening/Recess can Assign a side texture from the palette. Niche needs a style pack. Billboard stays a card. **Volume** is a pilaster box into the room (wall stays); picking it from a 4 m Place Arch shrinks width to 0.55 m and depth to 0.45 m. The 2D view draws that footprint.
 
 ### EyePaths
 

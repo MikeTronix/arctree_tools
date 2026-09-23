@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from passages_tool.converter.arch_builder import build_arches
 from passages_tool.converter.opening import (
+    apply_volume_kind_defaults,
     collect_opening_punches,
     is_3d_opening,
     is_volume,
@@ -238,6 +239,53 @@ def test_volume_box_has_five_faces_no_punch(tmp_path):
 
     assert covers(5.0, 1.0)
     assert collect_opening_punches(level) == {}
+
+
+def test_apply_volume_kind_defaults_shrinks_door_width():
+    a = Polyline.make_arch((0.0, 0.0))
+    a.orientation = 90.0
+    a.width = 4.0
+    a.auto_snap = True
+    apply_volume_kind_defaults(a)
+    assert abs(a.width - 0.55) < 1e-9
+    assert abs(a.depth_m - 0.45) < 1e-9
+    assert a.auto_snap is False
+
+
+def test_apply_volume_kind_defaults_keeps_modest_width():
+    a = Polyline.make_arch((0.0, 0.0))
+    a.orientation = 90.0
+    a.width = 0.8
+    a.depth_m = 0.3
+    apply_volume_kind_defaults(a)
+    assert abs(a.width - 0.8) < 1e-9
+    assert abs(a.depth_m - 0.3) < 1e-9
+
+
+def test_volume_ignores_auto_snap_span(tmp_path):
+    level = Level()
+    level.meta.wall_height = 4.0
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (10.0, 0.0)]
+    from passages_tool.editor.polyline_data import TextureInterval
+    wall.texture_intervals = [TextureInterval(0, 1, "wall.png")]
+    level.add_polyline(wall)
+    vol = Polyline.make_arch((5.0, 0.0))
+    vol.orientation = 90.0
+    vol.auto_snap = True
+    vol.width = 0.55
+    vol.kind = "volume"
+    vol.depth_m = 0.45
+    vol.height_override = 4.0
+    vol.texture = "stone.png"
+    level.add_polyline(vol)
+    polys = get_egg_polygons(build_arches(level, texture_dir=tmp_path)[0])
+    xs = []
+    for poly in polys:
+        for v in get_polygon_vertices(poly):
+            xs.append(v["pos"][0])
+    assert xs
+    assert max(xs) - min(xs) < 1.0
 
 
 def test_billboard_ignores_depth(tmp_path):
