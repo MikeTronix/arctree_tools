@@ -336,7 +336,7 @@ P2 architecture (including 5.5 EggContext texture parenting) is done. **4.1** mu
 
 **Style dressing** (`design_docs/passages_style_dressing_20SEP26.md`) is the primary dressing plan: environment **bands**, clicked **interruptions** (3D opening slabs vs POM niches), seeded **overlays**. The older index-map + 8-slot GPU plan (`passages_pom_metatexture_14SEP26.md`) is **superseded as authoring interchange**. Keep Phase 0 (custom GLSL offscreen **passed**), UV-in-meters, unique-map compose, and silhouette POM. Do not start old P1 (R-codes / arrays) unless a painted override mask is needed later.
 
-**S1–S7** done. Editor UX: Level Properties style picker + POM/overlay seed/ceiling mode; Arch Dressing kind combo (opening/niche/volume/recess).
+**S1–S7** done. Editor UX: Level Properties style picker + POM/overlay seed/ceiling mode; Arch Dressing kind combo (opening/niche/volume/recess). Kind **Volume** applies pilaster defaults (0.55 × 0.45 m, auto-snap off) and draws a 2D footprint.
 
 ---
 

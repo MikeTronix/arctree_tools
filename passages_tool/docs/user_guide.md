@@ -326,7 +326,7 @@ UTF-8 JSON, `"version": 2`. See the README for a full sample. Summary:
 | `polylines[].type` | `wall` \| `arch` \| `eyepath` \| `anchor` |
 | Wall `texture_intervals` | `from_vertex`, `to_vertex`, `texture`, `x_offset` |
 | EyePath `edges` | Directed `[from, to]` pairs |
-| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` / `recess` punch; `niche` POM; `volume` pilaster |
+| Arch `kind`, `profile`, `depth_m`, `side_texture` | Optional. `opening` / `recess` punch; `niche` POM; `volume` pilaster (Kind Volume shrinks a 4 m door to 0.55 × 0.45 m) |
 | `meta.ceiling_mode` | Optional `closed` \| `none` (no roof) |
 
 ---
