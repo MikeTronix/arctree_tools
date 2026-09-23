@@ -192,7 +192,7 @@ Sprite slots for the runtime. They are not meshed into `.egg`. Visibility occlus
 
 ### Select, move, delete
 
-- **Select:** click a handle (~12 px) or a segment.
+- **Select:** click a handle (~12 px) or a segment. Clicking a handle marks that vertex: it turns white and larger, a `[n]` label sits next to it, and Properties shows **selected n / N** and scrolls to that row.
 - **Move vertex:** left-drag the handle (snap applies if Snap is on). You can also type X/Z in Properties.
 - **Delete vertex:** **X** on that row in Properties.
 - **Delete polyline:** `Delete` key or **Delete polyline** (ignored while typing in a field).

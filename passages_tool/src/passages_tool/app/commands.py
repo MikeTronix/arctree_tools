@@ -132,6 +132,16 @@ class CommandsMixin:
     def _cb_del_vertex(self, pid: str, idx: int) -> None:
         self._hist()
         self._level.delete_vertex(pid, idx)
+        pl = self._level.get_polyline(pid)
+        n = len(pl.vertices) if pl else 0
+        sel = self._pm.selected_vertex_idx
+        if pid == self._pm.selected_id and sel is not None:
+            if n <= 0:
+                self._pm.select(pid, None)
+            elif sel == idx:
+                self._pm.select(pid, min(idx, n - 1))
+            elif sel > idx:
+                self._pm.select(pid, sel - 1)
         self._pm.rebuild_one(pid)
 
     def _cb_insert_vertex(self, pid: str, after_idx: int,
@@ -168,6 +178,11 @@ class CommandsMixin:
         self._hist()
         self._level.replace_polyline(convert_polyline_type(pl, new_type))
         self._pm.rebuild_one(pid)
+
+    def _cb_select_vertex(self, idx: int) -> None:
+        pid = self._pm.selected_id
+        if pid:
+            self._pm.select(pid, idx)
 
     def _cb_set_field(self, pid: str, field: str, value) -> None:
         """Generic field setter for Arch (and future) properties."""

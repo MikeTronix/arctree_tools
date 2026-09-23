@@ -122,6 +122,7 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
             "set_type":                self._cb_set_type,
             "set_field":               self._cb_set_field,
             "move_vertex":             self._cb_move_vertex,
+            "select_vertex":           self._cb_select_vertex,
             "del_vertex":              self._cb_del_vertex,
             "insert_vertex":           self._cb_insert_vertex,
             "del_polyline":            self._cb_del_polyline,
@@ -197,7 +198,9 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
             self._props.draw(
                 sel_pl, self._palette.selected_name, self._level, self._ui_scale,
                 menu_bar_h=bar_h,
+                selected_vertex_idx=self._pm.selected_vertex_idx,
             )
+            self._draw_vertex_index_overlay(sel_pl)
 
             if self._arch_snap_pending:
                 from imgui_bundle import imgui
@@ -244,6 +247,37 @@ class PassagesApp(InputMixin, CommandsMixin, PreviewMixin, ShowBase):
         except Exception:
             log.exception("ImGui frame failed")
         return task.cont
+
+    def _draw_vertex_index_overlay(self, polyline) -> None:
+        """Viewport label for the picked vertex (index in the polyline)."""
+        idx = self._pm.selected_vertex_idx
+        if polyline is None or idx is None or idx < 0 or idx >= len(polyline.vertices):
+            return
+        try:
+            from imgui_bundle import imgui
+        except ImportError:
+            return
+        vx, vz = polyline.vertices[idx]
+        ndc_x, ndc_y = self._cam.world_to_screen(vx, vz)
+        dw = imgui.get_io().display_size.x
+        dh = imgui.get_io().display_size.y
+        px = (ndc_x + 1.0) * 0.5 * dw
+        py = (1.0 - ndc_y) * 0.5 * dh
+        flags = (
+            imgui.WindowFlags_.no_title_bar.value
+            | imgui.WindowFlags_.no_resize.value
+            | imgui.WindowFlags_.no_move.value
+            | imgui.WindowFlags_.no_collapse.value
+            | imgui.WindowFlags_.always_auto_resize.value
+        )
+        no_inputs = getattr(imgui.WindowFlags_, "no_inputs", None)
+        if no_inputs is not None:
+            flags |= no_inputs.value
+        imgui.set_next_window_pos((px + 10.0, py - 8.0))
+        imgui.set_next_window_bg_alpha(0.72)
+        imgui.begin("##vtx_idx_overlay", flags=flags)
+        imgui.text(f"[{idx}]")
+        imgui.end()
 
     def _rebuild_grid(self) -> None:
         fw = self._cam.film_w

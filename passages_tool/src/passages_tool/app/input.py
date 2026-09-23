@@ -234,7 +234,7 @@ class InputMixin:
                     best_pid = pid
                     best_idx = i
         if best_pid is not None and best_idx is not None:
-            self._pm.select(best_pid)
+            self._pm.select(best_pid, best_idx)
             self._drag_pid = best_pid
             self._drag_idx = best_idx
             return

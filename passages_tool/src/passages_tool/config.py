@@ -54,7 +54,8 @@ POLYLINE_COLOR_HOVER       = (1.0, 0.5, 0.1, 1.0)   # orange
 
 VERTEX_HANDLE_RADIUS: float = 0.18    # world units
 VERTEX_HANDLE_COLOR         = (1.0, 1.0, 1.0, 1.0)
-VERTEX_HANDLE_SEL_COLOR     = (1.0, 1.0, 0.3, 1.0)   # bright yellow when selected
+VERTEX_HANDLE_SEL_COLOR     = (1.0, 1.0, 0.3, 1.0)   # bright yellow when polyline selected
+VERTEX_HANDLE_ACTIVE_COLOR  = (1.0, 1.0, 1.0, 1.0)   # the picked vertex on that polyline
 
 # ── Per-type polyline colours ─────────────────────────────────────────────────
 # Wall: warm yellow; Arch: cyan; EyePath: spring green; Anchor: blue-violet.

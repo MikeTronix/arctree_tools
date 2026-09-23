@@ -23,6 +23,7 @@ Callbacks (caller must supply in the dict passed to __init__)
   set_field(pid, field, value)
   move_vertex(pid, idx, x, z)
   del_vertex(pid, idx)
+  select_vertex(idx)
   del_polyline(pid)
   -- Phase 3 additions --
   set_interval_texture(pid, idx, tex|None)
@@ -140,6 +141,7 @@ class PropertiesPanel:
         level:       Optional[Level] = None,
         ui_scale:    float = 1.0,
         menu_bar_h:  float = 0.0,
+        selected_vertex_idx: Optional[int] = None,
     ) -> None:
         """Render the properties panel. Must be called inside an imgui frame."""
         try:
@@ -149,12 +151,15 @@ class PropertiesPanel:
 
         self._ui_scale = ui_scale
 
-        # Reset selected vertex preview state if the selected polyline changes
+        # Reset preview image if the selected polyline changes.
         cur_id = polyline.id if polyline else None
         if getattr(self, "_last_polyline_id", None) != cur_id:
             self._last_polyline_id = cur_id
-            self._selected_vertex_idx = None
             self._preview_image_ref = None
+        if selected_vertex_idx != getattr(self, "_shown_vertex_idx", object()):
+            self._shown_vertex_idx = selected_vertex_idx
+            self._scroll_to_vertex = selected_vertex_idx is not None
+        self._selected_vertex_idx = selected_vertex_idx
 
         display_w = imgui.get_io().display_size.x
         display_h = imgui.get_io().display_size.y
@@ -270,7 +275,11 @@ class PropertiesPanel:
         imgui.separator()
 
         # ── Vertex list ───────────────────────────────────────────────────────
+        n = len(polyline.vertices)
         imgui.text_colored((0.9, 0.8, 0.2, 1.0), "Vertices")
+        if self._selected_vertex_idx is not None:
+            imgui.same_line()
+            imgui.text_disabled(f"  selected {self._selected_vertex_idx} / {n}")
         self._draw_vertex_list(imgui, polyline)
 
     def _draw_interval_editor(
@@ -687,6 +696,11 @@ class PropertiesPanel:
         # ── Vertex list ───────────────────────────────────────────────────────
         imgui.separator()
         imgui.text_colored((0.28, 0.91, 0.50, 1.0), "Vertices")
+        if self._selected_vertex_idx is not None:
+            imgui.same_line()
+            imgui.text_disabled(
+                f"  selected {self._selected_vertex_idx} / {len(polyline.vertices)}"
+            )
         self._draw_vertex_list(imgui, polyline)
 
         # ── Render Preview section ────────────────────────────────────────────
@@ -848,18 +862,20 @@ class PropertiesPanel:
         for i, (vx, vz) in enumerate(polyline.vertices):
             imgui.push_id(i)
             try:
-                # If the polyline is an eyepath, make the vertex select-clickable
-                if polyline.type == PolylineType.EYEPATH:
-                    is_selected = (self._selected_vertex_idx == i)
-                    if is_selected:
-                        imgui.push_style_color(imgui.Col_.button.value, (0.2, 0.7, 0.3, 1.0))
-                    if imgui.small_button(f"[{i}]##sel"):
-                        self._selected_vertex_idx = i
-                        self._preview_image_ref = None
-                    if is_selected:
-                        imgui.pop_style_color()
-                else:
-                    imgui.text(f"[{i}]")
+                is_selected = (self._selected_vertex_idx == i)
+                if is_selected:
+                    imgui.push_style_color(imgui.Col_.button.value, (0.2, 0.7, 0.3, 1.0))
+                if imgui.small_button(f"[{i}]##sel"):
+                    fn_sel = self._cb.get("select_vertex")
+                    if fn_sel:
+                        fn_sel(i)
+                    self._selected_vertex_idx = i
+                    self._preview_image_ref = None
+                if is_selected:
+                    imgui.pop_style_color()
+                    if getattr(self, "_scroll_to_vertex", False):
+                        imgui.set_scroll_here_y(0.25)
+                        self._scroll_to_vertex = False
                 imgui.same_line()
                 imgui.set_next_item_width(self._px(85))
                 cx, nx = imgui.input_float(f"x##{i}", vx, format="%.2f")

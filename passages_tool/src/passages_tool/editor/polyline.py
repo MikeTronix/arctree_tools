@@ -59,6 +59,7 @@ from passages_tool.config import (
     HATCH_MIN_EDGE,
     INTERVAL_COLORS,
     POLYLINE_THICKNESS,
+    VERTEX_HANDLE_ACTIVE_COLOR,
     VERTEX_HANDLE_RADIUS,
     VERTEX_HANDLE_SEL_COLOR,
 )
@@ -85,6 +86,7 @@ class PolylineNode:
         self._root     = render_root
         self._data     = data
         self._selected = selected
+        self._selected_vertex_idx: Optional[int] = None
         self._highlighted_error = False
 
         # _geo_np parents all decorative line geometry.
@@ -124,7 +126,20 @@ class PolylineNode:
         if self._selected == selected:
             return
         self._selected = selected
+        if not selected:
+            self._selected_vertex_idx = None
         self.rebuild()
+
+    def set_selected_vertex(self, idx: Optional[int]) -> None:
+        if self._selected_vertex_idx == idx:
+            return
+        self._selected_vertex_idx = idx
+        if not self._selected:
+            return
+        for np in self._handle_nps:
+            np.removeNode()
+        self._handle_nps.clear()
+        self._build_handles()
 
     def set_highlighted_error(self, value: bool) -> None:
         if self._highlighted_error != value:
@@ -401,10 +416,16 @@ class PolylineNode:
         else:
             unsel_color = COLOR_WALL
 
-        handle_color = VERTEX_HANDLE_SEL_COLOR if self._selected else unsel_color
-
-        r = VERTEX_HANDLE_RADIUS
         for i, (x, z) in enumerate(self._data.vertices):
+            if self._selected and i == self._selected_vertex_idx:
+                handle_color = VERTEX_HANDLE_ACTIVE_COLOR
+                r = VERTEX_HANDLE_RADIUS * 1.6
+            elif self._selected:
+                handle_color = VERTEX_HANDLE_SEL_COLOR
+                r = VERTEX_HANDLE_RADIUS
+            else:
+                handle_color = unsel_color
+                r = VERTEX_HANDLE_RADIUS
             cm = CardMaker(f"vtx_{self._data.id}_{i}")
             cm.setFrame(-r, r, -r, r)
             np = self._root.attachNewNode(cm.generate())
@@ -443,6 +464,7 @@ class PolylineManager:
         self._root:  NodePath = render_root
         self._nodes: dict[str, PolylineNode] = {}
         self._selected_id: Optional[str] = None
+        self._selected_vertex_idx: Optional[int] = None
         self.level: Optional[Level] = None
 
     # ── Sync ──────────────────────────────────────────────────────────────────
@@ -476,20 +498,31 @@ class PolylineManager:
 
     # ── Selection ─────────────────────────────────────────────────────────────
 
-    def select(self, polyline_id: Optional[str]) -> None:
-        if self._selected_id == polyline_id:
+    def select(self, polyline_id: Optional[str], vertex_idx: Optional[int] = None) -> None:
+        if self._selected_id != polyline_id:
+            if self._selected_id and self._selected_id in self._nodes:
+                self._nodes[self._selected_id].set_selected(False)
+            self._selected_id = polyline_id
+            self._selected_vertex_idx = None
+            if polyline_id and polyline_id in self._nodes:
+                self._nodes[polyline_id].set_selected(True)
+        if not polyline_id:
+            self._selected_vertex_idx = None
             return
-        # Deselect previous.
-        if self._selected_id and self._selected_id in self._nodes:
-            self._nodes[self._selected_id].set_selected(False)
-        self._selected_id = polyline_id
-        # Select new.
-        if polyline_id and polyline_id in self._nodes:
-            self._nodes[polyline_id].set_selected(True)
+        if self._selected_vertex_idx == vertex_idx:
+            return
+        self._selected_vertex_idx = vertex_idx
+        node = self._nodes.get(polyline_id)
+        if node:
+            node.set_selected_vertex(vertex_idx)
 
     @property
     def selected_id(self) -> Optional[str]:
         return self._selected_id
+
+    @property
+    def selected_vertex_idx(self) -> Optional[int]:
+        return self._selected_vertex_idx
 
     def set_highlights(self, highlighted_ids: set[str]) -> None:
         for pid, node in self._nodes.items():
@@ -502,3 +535,4 @@ class PolylineManager:
             node.destroy()
         self._nodes.clear()
         self._selected_id = None
+        self._selected_vertex_idx = None
