@@ -50,6 +50,30 @@ def _texture_intervals_overlap(a: TextureInterval, b: TextureInterval) -> bool:
     return a.from_vertex < b.to_vertex and b.from_vertex < a.to_vertex
 
 
+def carve_untextured_intervals(
+    intervals: list[TextureInterval], span: TextureInterval,
+) -> Optional[list[TextureInterval]]:
+    """Drop untextured coverage on ``span`` so a PNG override can be inserted.
+
+    Returns None if a textured interval already occupies any of that range.
+    """
+    for other in intervals:
+        if other.texture and _texture_intervals_overlap(span, other):
+            return None
+    out: list[TextureInterval] = []
+    for other in intervals:
+        if other.texture or not _texture_intervals_overlap(span, other):
+            out.append(other)
+            continue
+        if other.from_vertex < span.from_vertex:
+            out.append(TextureInterval(
+                other.from_vertex, span.from_vertex, None, other.x_offset,
+            ))
+        if span.to_vertex < other.to_vertex:
+            out.append(TextureInterval(span.to_vertex, other.to_vertex, None, 0.0))
+    return out
+
+
 def interval_edge_indices(pl: "Wall", iv: TextureInterval) -> list[int]:
     """Edge indices covered by a texture interval.
 

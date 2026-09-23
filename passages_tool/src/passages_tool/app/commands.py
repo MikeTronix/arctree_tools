@@ -214,10 +214,11 @@ class CommandsMixin:
         self._level.set_interval_x_offset(pid, idx, x)
 
     def _cb_add_texture_interval(
-            self, pid: str, from_v: int, to_v: int) -> None:
+            self, pid: str, from_v: int, to_v: int,
+            tex: Optional[str] = None) -> None:
         self._hist()
         self._level.add_texture_interval(
-            pid, TextureInterval(from_vertex=from_v, to_vertex=to_v))
+            pid, TextureInterval(from_vertex=from_v, to_vertex=to_v, texture=tex))
         self._pm.rebuild_one(pid)
 
     def _cb_remove_texture_interval(self, pid: str, idx: int) -> None:

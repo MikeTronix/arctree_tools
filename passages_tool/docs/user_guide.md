@@ -170,8 +170,8 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 1. `W`, left-click vertices, Enter/RMB to finish.
 2. Closed walls: tick **Closed** in Properties (closing edge is textured by an interval that reaches the last vertex).
-3. On a styled level (Level Properties → **Style**), walls use that pack’s bands and overlays. Select the wall and **Use style on this wall** to drop PNG interval filenames. A PNG on an interval is an override (old UV path). Unique maps show in 3D preview / bake, not on the 2D plan.
-4. Texture with **intervals** (from-vertex → to-vertex, texture, x-offset) when you want a PNG override. Overlapping intervals are rejected.
+3. On a styled level (Level Properties → **Style**), walls use that pack’s bands and overlays. Select the wall and **Use style on this wall** to clear intervals. Unique maps show in 3D preview / bake, not on the 2D plan.
+4. PNG override: pick a texture in the palette, set **Range V** from–to, **Assign PNG to range** (or Add range then Assign on the row). Style coverage is carved out; two PNG ranges still cannot overlap. **Split** cuts an existing interval at a vertex.
 5. **Ins** on a vertex row inserts a midpoint after that vertex.
 
 ### Arches

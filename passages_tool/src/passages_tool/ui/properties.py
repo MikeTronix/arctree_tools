@@ -288,6 +288,12 @@ class PropertiesPanel:
     ) -> None:
         heading = "PNG overrides" if style_id else "Texture Intervals"
         imgui.text_colored((0.9, 0.8, 0.2, 1.0), heading)
+        if style_id:
+            imgui.text_wrapped(
+                "Uncovered edges use the level style. Add or Split a vertex "
+                "range, then Assign a palette PNG. Style coverage is carved "
+                "automatically; two PNG ranges still cannot overlap."
+            )
 
         n_verts = len(polyline.vertices)
         max_v   = max(0, n_verts - 1)
@@ -346,24 +352,23 @@ class PropertiesPanel:
                 self._iv_split[i] = max(iv.from_vertex + 1,
                                         min(mid, iv.to_vertex - 1))
             imgui.same_line()
-            if not can_split:
-                imgui.begin_disabled()
-            self._iv_split[i] = self._int_stepper(
-                imgui, "spv",
-                self._iv_split[i],
-                iv.from_vertex + 1,
-                iv.to_vertex - 1,
-            )
-            imgui.same_line()
-            if imgui.small_button("Split"):
-                to_split = (i, self._iv_split[i])
-            if not can_split:
-                imgui.end_disabled()
-
-            # Remove
-            imgui.same_line()
             if imgui.small_button("X##ivdel"):
                 to_remove = i
+
+            if can_split:
+                imgui.indent()
+                imgui.text_disabled("Split at")
+                imgui.same_line()
+                self._iv_split[i] = self._int_stepper(
+                    imgui, "spv",
+                    self._iv_split[i],
+                    iv.from_vertex + 1,
+                    iv.to_vertex - 1,
+                )
+                imgui.same_line()
+                if imgui.small_button("Split"):
+                    to_split = (i, self._iv_split[i])
+                imgui.unindent()
 
             imgui.pop_id()
 
@@ -380,21 +385,29 @@ class PropertiesPanel:
 
         imgui.separator()
 
-        # ── Add new interval ──────────────────────────────────────────────────
-        imgui.text("Add interval:")
-        # Initialise _iv_to on first render (-1 = sentinel).
+        # ── Add / override range ──────────────────────────────────────────────
+        imgui.text("Range V")
         if self._iv_to < 0:
             self._iv_to = max_v
         self._iv_from = self._int_stepper(
             imgui, "iv_from", self._iv_from, 0, max(0, max_v - 1))
         imgui.same_line()
+        imgui.text_disabled("to")
+        imgui.same_line()
         self._iv_to = self._int_stepper(
             imgui, "iv_to", self._iv_to, self._iv_from + 1, max_v)
-        imgui.same_line()
-        if imgui.small_button("Add##iv"):
+        if imgui.small_button("Add range"):
             fn = self._cb.get("add_texture_interval")
             if fn:
                 fn(polyline.id, self._iv_from, self._iv_to)
+        if palette_sel:
+            imgui.same_line()
+            if imgui.small_button("Assign PNG to range"):
+                fn = self._cb.get("add_texture_interval")
+                if fn:
+                    fn(polyline.id, self._iv_from, self._iv_to, palette_sel)
+        elif style_id:
+            imgui.text_disabled("Select a PNG in the Textures palette, then Assign PNG to range.")
 
     # ── ARCH ──────────────────────────────────────────────────────────────────
 

@@ -83,12 +83,32 @@ class TestSetIntervalTexture:
         level.add_texture_interval(pl.id, TextureInterval(2, 4, texture="b.png"))
         level.dirty = False
         level.clear_wall_png_overrides(pl.id)
-        assert pl.texture_intervals[0].texture is None
-        assert pl.texture_intervals[1].texture is None
+        assert pl.texture_intervals == []
         assert level.dirty
         level.dirty = False
         level.clear_wall_png_overrides(pl.id)
         assert level.dirty is False
+
+    def test_add_png_override_carves_style_span(self):
+        level, pl = _wall_with_verts(8)
+        level.add_texture_interval(pl.id, TextureInterval(0, 7))
+        ok = level.add_texture_interval(
+            pl.id, TextureInterval(2, 5, texture="mural.png"))
+        assert ok
+        ivs = pl.texture_intervals
+        assert [(iv.from_vertex, iv.to_vertex, iv.texture) for iv in ivs] == [
+            (0, 2, None),
+            (2, 5, "mural.png"),
+            (5, 7, None),
+        ]
+
+    def test_add_still_rejects_png_on_png_overlap(self):
+        level, pl = _wall_with_verts(8)
+        level.add_texture_interval(pl.id, TextureInterval(0, 4, texture="a.png"))
+        ok = level.add_texture_interval(
+            pl.id, TextureInterval(2, 6, texture="b.png"))
+        assert ok is False
+        assert len(pl.texture_intervals) == 1
 
 
 # ══════════════════════════════════════════════════════════════════════════════
