@@ -386,6 +386,10 @@ Mouse is over a panel. Move it over the viewport.
 
 They should not. If a field is focused, `S`/`W`/… are ignored. Click the viewport if a shortcut seems dead.
 
+### Recess looks like a window into the next room
+
+The wall was punched and the alcove box extruded the wrong way because the arch azimuth was 180° off (normal pointing out of the room). On a closed wall the baker now takes the room interior as the facing, so the back still sits in the wall. Open walls keep the authored angle. Re-bake after updating. This is not a GPU resource limit.
+
 ### Validate flags every closed wall as untextured
 
 You are on a build older than the shared closing-edge helper. Update the tool.

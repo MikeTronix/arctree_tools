@@ -13,6 +13,7 @@ from passages_tool.editor.level import Level, PolylineType, wall_edge_index_pair
 BUILTIN_PROFILES = ("rect", "round", "gothic")
 _PUNCH_DIST_M = 0.25
 _MIN_SPAN = 0.02
+_ROOM_PROBE_M = 0.05
 
 
 def is_recess(pl) -> bool:
@@ -178,6 +179,86 @@ def _project_t(px: float, py: float, ax: float, ay: float, bx: float, by: float)
     if L2 < 1e-12:
         return 0.0
     return ((px - ax) * dx + (py - ay) * dy) / L2
+
+
+def _closed_wall_loop(pl) -> Optional[list[tuple[float, float]]]:
+    """Ring vertices for a closed wall, or None. Closing duplicate dropped."""
+    if getattr(pl, "type", None) != PolylineType.WALL:
+        return None
+    verts = list(getattr(pl, "vertices", None) or [])
+    if len(verts) < 3:
+        return None
+    closed = bool(getattr(pl, "closed", False))
+    if not closed and math.dist(verts[0], verts[-1]) >= 1e-4:
+        return None
+    if math.dist(verts[0], verts[-1]) < 1e-4:
+        verts = verts[:-1]
+    if len(verts) < 3:
+        return None
+    return verts
+
+
+def _point_in_ring(px: float, py: float, verts: list[tuple[float, float]]) -> bool:
+    """Even-odd test. The enclosed area is the room for a closed wall."""
+    inside = False
+    n = len(verts)
+    j = n - 1
+    for i in range(n):
+        xi, yi = verts[i]
+        xj, yj = verts[j]
+        if (yi > py) != (yj > py):
+            denom = yj - yi
+            if abs(denom) > 1e-18 and px < (xj - xi) * (py - yi) / denom + xi:
+                inside = not inside
+        j = i
+    return inside
+
+
+def room_facing_normal(
+    level: Level,
+    p_left: tuple[float, float],
+    p_right: tuple[float, float],
+    nx: float,
+    ny: float,
+) -> tuple[float, float]:
+    """Unit normal pointing into the closed room this span sits on.
+
+    Probe the enclosed polygon of the nearest closed wall within
+    ``_PUNCH_DIST_M``. Open walls and spans that miss every closed wall keep
+    ``(nx, ny)`` so author azimuth stays the source of truth there.
+    """
+    nlen = math.hypot(nx, ny)
+    if nlen < 1e-12:
+        return nx, ny
+    ux, uy = nx / nlen, ny / nlen
+    mx = 0.5 * (p_left[0] + p_right[0])
+    my = 0.5 * (p_left[1] + p_right[1])
+    best_d = _PUNCH_DIST_M
+    best_inside: Optional[bool] = None
+    for pl in level.polylines.values():
+        loop = _closed_wall_loop(pl)
+        if loop is None:
+            continue
+        n_loop = len(loop)
+        d = min(
+            _dist_point_line(
+                mx, my,
+                loop[i][0], loop[i][1],
+                loop[(i + 1) % n_loop][0], loop[(i + 1) % n_loop][1],
+            )
+            for i in range(n_loop)
+        )
+        if d > best_d + 1e-9:
+            continue
+        probe = _point_in_ring(
+            mx + ux * _ROOM_PROBE_M, my + uy * _ROOM_PROBE_M, loop
+        )
+        if best_inside is None or d < best_d - 1e-9:
+            best_d = d
+            best_inside = probe
+    if best_inside is False:
+        return -ux, -uy
+    return ux, uy
 
 
 def project_opening_onto_edge(

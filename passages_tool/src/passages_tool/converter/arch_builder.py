@@ -21,6 +21,7 @@ from passages_tool.converter.opening import (
     opening_depth_m,
     opening_profile_name,
     profile_polyline,
+    room_facing_normal,
 )
 from passages_tool.converter.wall_builder import get_texture_size
 from passages_tool.editor.level import Level, Polyline, PolylineType
@@ -144,6 +145,14 @@ def _world_on_span(p_left, p_right, width, nx, ny, s, z, along):
     return x, y, z
 
 
+def _align_span_to_normal(p_left, p_right, width, nx, ny):
+    """Rebuild left/right so the span matches ``(nx, ny)`` (winding + extrusion)."""
+    mid = (0.5 * (p_left[0] + p_right[0]), 0.5 * (p_left[1] + p_right[1]))
+    dx_w = (width / 2.0) * (-ny)
+    dy_w = (width / 2.0) * nx
+    return (mid[0] - dx_w, mid[1] - dy_w), (mid[0] + dx_w, mid[1] + dy_w)
+
+
 def _add_quad(ctx, group, pts, tex, normal):
     verts = []
     uvs = ((0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0))
@@ -172,8 +181,10 @@ def _build_volume_box(
 ) -> None:
     """Box on the wall. ``into_room``: +normal (pilaster). Else −normal (recess).
 
-    Wall-plane face is omitted (flush / hole). Far cap uses ``tex`` (recess back /
-    pilaster front). Jambs, soffit, and floor use ``side_tex`` (falls back to ``tex``).
+    ``nx, ny`` point into the room (``build_arches`` corrects 180° azimuth on
+    closed walls). Wall-plane face is omitted (flush / hole). Far cap uses
+    ``tex`` (recess back / pilaster front). Jambs, soffit, and floor use
+    ``side_tex`` (falls back to ``tex``).
     """
     depth = max(0.05, float(depth))
     w = max(1e-4, float(width))
@@ -373,6 +384,16 @@ def build_arches(
                 dy_w = (width / 2.0) * math.cos(theta_rad)
                 p_left = (x_world - dx_w, y_world - dy_w)
                 p_right = (x_world + dx_w, y_world + dy_w)
+
+        if not is_billboard and width > 1e-6:
+            rx, ry = room_facing_normal(level, p_left, p_right, nx, ny)
+            if rx * nx + ry * ny < 0.0:
+                nx, ny = rx, ry
+                p_left, p_right = _align_span_to_normal(
+                    p_left, p_right, width, nx, ny
+                )
+            else:
+                nx, ny = rx, ry
 
         height = (
             pl.height_override

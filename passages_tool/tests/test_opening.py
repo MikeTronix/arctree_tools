@@ -1,6 +1,8 @@
 """S4: profiles, wall punch leftovers, 3D opening eggs."""
 from __future__ import annotations
 
+import pytest
+
 from passages_tool.converter.arch_builder import build_arches
 from passages_tool.converter.opening import (
     apply_volume_kind_defaults,
@@ -10,6 +12,7 @@ from passages_tool.converter.opening import (
     leftover_patches,
     profile_polyline,
     project_opening_onto_edge,
+    room_facing_normal,
     subtract_rect,
     WallHole,
     WallPatch,
@@ -239,6 +242,81 @@ def test_volume_box_has_five_faces_no_punch(tmp_path):
 
     assert covers(5.0, 1.0)
     assert collect_opening_punches(level) == {}
+
+
+def _closed_box_level():
+    level = Level()
+    level.meta.wall_height = 4.0
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (10.0, 0.0), (10.0, 8.0), (0.0, 8.0)]
+    wall.closed = True
+    from passages_tool.editor.polyline_data import TextureInterval
+    wall.texture_intervals = [TextureInterval(0, 1, "wall.png")]
+    level.add_polyline(wall)
+    return level
+
+
+def test_room_facing_normal_closed_box_flips_180():
+    level = _closed_box_level()
+    # South wall y=0: author +Y is into the room.
+    sx, sy = room_facing_normal(level, (4.4, 0.0), (5.6, 0.0), 0.0, 1.0)
+    assert sx == pytest.approx(0.0)
+    assert sy == pytest.approx(1.0)
+    # North wall y=8: author +Y points out of the room.
+    nx, ny = room_facing_normal(level, (4.4, 8.0), (5.6, 8.0), 0.0, 1.0)
+    assert nx == pytest.approx(0.0)
+    assert ny == pytest.approx(-1.0)
+
+
+def test_room_facing_normal_open_wall_keeps_author():
+    level = Level()
+    wall = Polyline.make_wall()
+    wall.vertices = [(0.0, 0.0), (10.0, 0.0)]
+    level.add_polyline(wall)
+    nx, ny = room_facing_normal(level, (4.4, 0.0), (5.6, 0.0), 0.0, 1.0)
+    assert nx == pytest.approx(0.0)
+    assert ny == pytest.approx(1.0)
+
+
+def test_recess_flipped_azimuth_back_outside_room(tmp_path):
+    """180° off on the north wall still extrudes into the wall, back facing in."""
+    level = _closed_box_level()
+    rec = Polyline.make_arch((5.0, 8.0))
+    rec.orientation = 90.0  # +Y, opposite the room
+    rec.width = 1.2
+    rec.kind = "recess"
+    rec.depth_m = 0.4
+    rec.height_override = 2.0
+    rec.texture = "back.png"
+    rec.side_texture = "jamb.png"
+    level.add_polyline(rec)
+    polys = get_egg_polygons(build_arches(level, texture_dir=tmp_path)[0])
+    assert len(polys) == 5
+    far = get_polygon_vertices(polys[0])
+    ys = [v["pos"][1] for v in far]
+    assert min(ys) == pytest.approx(8.4)
+    assert max(ys) == pytest.approx(8.4)
+    for v in far:
+        assert v["normal"][0] == pytest.approx(0.0)
+        assert v["normal"][1] == pytest.approx(-1.0)
+
+
+def test_recess_south_wall_back_outside_room(tmp_path):
+    level = _closed_box_level()
+    rec = Polyline.make_arch((5.0, 0.0))
+    rec.orientation = 90.0
+    rec.width = 1.2
+    rec.kind = "recess"
+    rec.depth_m = 0.4
+    rec.height_override = 2.0
+    rec.texture = "back.png"
+    level.add_polyline(rec)
+    polys = get_egg_polygons(build_arches(level, texture_dir=tmp_path)[0])
+    far = get_polygon_vertices(polys[0])
+    ys = [v["pos"][1] for v in far]
+    assert max(ys) == pytest.approx(-0.4)
+    for v in far:
+        assert v["normal"][1] == pytest.approx(1.0)
 
 
 def test_recess_back_uses_main_texture_not_side(tmp_path):
