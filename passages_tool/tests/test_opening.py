@@ -241,6 +241,28 @@ def test_volume_box_has_five_faces_no_punch(tmp_path):
     assert collect_opening_punches(level) == {}
 
 
+def test_recess_back_uses_main_texture_not_side(tmp_path):
+    level = Level()
+    level.meta.wall_height = 4.0
+    rec = Polyline.make_arch((5.0, 0.0))
+    rec.orientation = 90.0
+    rec.width = 1.2
+    rec.kind = "recess"
+    rec.depth_m = 0.4
+    rec.height_override = 2.0
+    rec.texture = "back.png"
+    rec.side_texture = "jamb.png"
+    level.add_polyline(rec)
+    polys = get_egg_polygons(build_arches(level, texture_dir=tmp_path)[0])
+    assert len(polys) == 5
+    names = []
+    for poly in polys:
+        n = poly.get_num_textures()
+        names.append(str(poly.get_texture(0).get_filename()) if n else "")
+    assert "back.png" in names[0]
+    assert all("jamb.png" in n for n in names[1:])
+
+
 def test_apply_volume_kind_defaults_shrinks_door_width():
     a = Polyline.make_arch((0.0, 0.0))
     a.orientation = 90.0

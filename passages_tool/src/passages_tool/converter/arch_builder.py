@@ -168,10 +168,12 @@ def _build_volume_box(
     tex,
     *,
     into_room: bool = True,
+    side_tex=None,
 ) -> None:
     """Box on the wall. ``into_room``: +normal (pilaster). Else −normal (recess).
 
-    Wall-plane face is omitted (flush / hole). Far cap is always emitted.
+    Wall-plane face is omitted (flush / hole). Far cap uses ``tex`` (recess back /
+    pilaster front). Jambs, soffit, and floor use ``side_tex`` (falls back to ``tex``).
     """
     depth = max(0.05, float(depth))
     w = max(1e-4, float(width))
@@ -182,6 +184,7 @@ def _build_volume_box(
     sy = (p_right[1] - p_left[1]) / w
     n_right = (sx, sy, 0.0)
     n_left = (-sx, -sy, 0.0)
+    sides = side_tex if side_tex is not None else tex
 
     def W(s, z, along):
         return _world_on_span(p_left, p_right, w, nx, ny, s, z, along)
@@ -195,22 +198,22 @@ def _build_volume_box(
     _add_quad(
         ctx, group,
         (W(0.0, z_bottom, a0), W(0.0, z_bottom, a1), W(0.0, z_top, a1), W(0.0, z_top, a0)),
-        tex, n_left,
+        sides, n_left,
     )
     _add_quad(
         ctx, group,
         (W(w, z_bottom, a1), W(w, z_bottom, a0), W(w, z_top, a0), W(w, z_top, a1)),
-        tex, n_right,
+        sides, n_right,
     )
     _add_quad(
         ctx, group,
         (W(0.0, z_top, a0), W(0.0, z_top, a1), W(w, z_top, a1), W(w, z_top, a0)),
-        tex, (0.0, 0.0, 1.0),
+        sides, (0.0, 0.0, 1.0),
     )
     _add_quad(
         ctx, group,
         (W(0.0, z_bottom, a1), W(0.0, z_bottom, a0), W(w, z_bottom, a0), W(w, z_bottom, a1)),
-        tex, (0.0, 0.0, -1.0),
+        sides, (0.0, 0.0, -1.0),
     )
 
 
@@ -399,8 +402,9 @@ def build_arches(
             side_tex = ctx.get_or_create_texture(side_name) if side_name else egg_tex
             _build_volume_box(
                 group, ctx, p_left, p_right, width, nx, ny,
-                z_bottom, z_top, depth, side_tex or egg_tex,
+                z_bottom, z_top, depth, egg_tex or side_tex,
                 into_room=False,
+                side_tex=side_tex or egg_tex,
             )
             if group.get_first_child() is not None:
                 groups.append(group)
@@ -416,8 +420,9 @@ def build_arches(
             side_tex = ctx.get_or_create_texture(side_name) if side_name else egg_tex
             _build_volume_box(
                 group, ctx, p_left, p_right, width, nx, ny,
-                z_bottom, z_top, depth, side_tex or egg_tex,
+                z_bottom, z_top, depth, egg_tex or side_tex,
                 into_room=True,
+                side_tex=side_tex or egg_tex,
             )
             if group.get_first_child() is not None:
                 groups.append(group)

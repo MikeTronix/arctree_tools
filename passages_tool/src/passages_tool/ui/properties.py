@@ -591,6 +591,8 @@ class PropertiesPanel:
             if kind in ("opening", "volume", "recess"):
                 side = getattr(polyline, "side_texture", None)
                 imgui.text("Side texture")
+                if kind == "recess":
+                    imgui.text_disabled("Jambs / soffit. Texture is the back wall.")
                 imgui.text_disabled((side or "(style / front)")[-26:])
                 if palette_sel and palette_sel != side:
                     if imgui.button("Assign side"):
