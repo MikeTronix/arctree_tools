@@ -349,7 +349,7 @@ REM Optional KTX2 / JPEG
 .venv\Scripts\python.exe -m passages_tool.renderer.convert_to_jpeg renders_out shipping_out
 ```
 
-Bake uses **every** EyePath. Vertex indices in `render_vXXXX_to_vYYYY` are global (first path starts at 0; later paths continue). Midpoint frames are the geometric 50% of each undirected edge. The baker also writes optional `yaw_vXXXX.png` strips (360° unwrap) and records them on `eyepoints.*.yaw_strip` when present. `bake.bat` still produces the same stills; `--no-yaw-strip` skips the extras. Clients without strips keep the old turn crossfade. Each **closed** wall gets its own floor and ceiling (a room). Open walls get none. Nested or overlapping closed walls both fill — that is an authoring error, not a courtyard hole.
+Bake uses **every** EyePath. Vertex indices in `render_vXXXX_to_vYYYY` are global (first path starts at 0; later paths continue). Midpoint frames are the geometric 50% of each undirected edge. The baker also writes optional `yaw_vXXXX.png` strips (360° unwrap, clockwise 0/270/180/90 so cube-face seams match) and records them on `eyepoints.*.yaw_strip` when present. Re-bake with `--force` after a unwrap change. `bake.bat` still produces the same stills; `--no-yaw-strip` skips the extras. Clients without strips keep the old turn crossfade. Each **closed** wall gets its own floor and ceiling (a room). Open walls get none. Nested or overlapping closed walls both fill — that is an authoring error, not a courtyard hole.
 
 ---
 

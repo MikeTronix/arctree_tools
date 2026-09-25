@@ -24,8 +24,15 @@ def test_default_strip_near_spec_sweet_spot():
 
 
 def test_face_yaws_cover_the_circle():
-    assert FACE_YAWS_DEG == (0.0, 90.0, 180.0, 270.0)
-    assert YAW_ORIGIN_DEG == -45.0
+    assert FACE_YAWS_DEG == (0.0, 270.0, 180.0, 90.0)
+    assert YAW_ORIGIN_DEG == 45.0
+    # Adjacent faces share an edge yaw: right of yaw θ is θ−45°, left of next
+    # (θ−90°) is (θ−90°)+45° = θ−45°.
+    for i, yaw in enumerate(FACE_YAWS_DEG):
+        nxt = FACE_YAWS_DEG[(i + 1) % 4]
+        right = (yaw - 45.0) % 360.0
+        left_next = (nxt + 45.0) % 360.0
+        assert right == pytest.approx(left_next)
 
 
 def test_look_at_from_yaw_plus_x():

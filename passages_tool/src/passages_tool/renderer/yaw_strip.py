@@ -1,8 +1,9 @@
 """Cylindrical yaw-strip helpers for turn slew (Feature 11).
 
-Four 90° cube faces unwrapped L→R at headings 0°, 90°, 180°, 270°
-(atan2 space, 0 = +X). Pixel 0 is the left edge of the first face (yaw −45°).
-The hi-res `render_vXXXX_to_vYYYY` stills are unchanged; this strip is extra.
+Panda cube faces have +yaw (CCW) on the image-left, so a continuous unwrap
+stitches clockwise: 0°, 270°, 180°, 90°. Pixel 0 is yaw +45°; increasing x
+is decreasing yaw. Re-bake existing ``yaw_v*.png`` after this change.
+The hi-res ``render_vXXXX_to_vYYYY`` stills are unchanged; this strip is extra.
 """
 from __future__ import annotations
 
@@ -15,8 +16,10 @@ from PIL import Image
 _STRIP_HEIGHT_REF = 341
 _STILL_HEIGHT_REF = 576
 FACE_HFOV_DEG = 90.0
-YAW_ORIGIN_DEG = -45.0  # yaw at strip pixel x=0
-FACE_YAWS_DEG = (0.0, 90.0, 180.0, 270.0)
+YAW_ORIGIN_DEG = 45.0  # yaw at strip pixel x=0 (left edge of the yaw-0 face)
+# Clockwise unwrap so each face's right edge matches the next face's left
+# (Panda: image-left = +yaw).
+FACE_YAWS_DEG = (0.0, 270.0, 180.0, 90.0)
 
 
 def yaw_strip_face_size(
