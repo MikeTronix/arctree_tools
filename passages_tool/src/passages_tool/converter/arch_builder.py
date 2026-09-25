@@ -15,6 +15,7 @@ from panda3d.egg import EggGroup, EggTexture
 from passages_tool.converter.egg_writer import EggContext
 from passages_tool.converter.opening import (
     is_3d_opening,
+    is_niche,
     is_recess,
     is_volume,
     opening_depth_m,
@@ -24,6 +25,10 @@ from passages_tool.converter.opening import (
 from passages_tool.converter.wall_builder import get_texture_size
 from passages_tool.editor.level import Level, Polyline, PolylineType
 from passages_tool.textures.style import StyleError, load_level_style
+
+# N-slice cards sit on the wall plane; push them into the room so a PNG
+# dressing does not z-fight (half the card inside the wall).
+_CARD_PUSH_M = 0.025
 
 
 def load_arch_config(texture_name: Optional[str], texture_dir: Optional[Path]) -> Optional[dict]:
@@ -380,6 +385,7 @@ def build_arches(
             v_bottom = (pl.z_offset * ppm) / tex_h
             v_top = ((pl.z_offset + height) * ppm) / tex_h
         else:
+            # PNG fills this card from its bottom (z_offset) to z_offset+height.
             v_bottom = 0.0
             v_top = (height * ppm) / tex_h
 
@@ -432,6 +438,11 @@ def build_arches(
             )
             if group.get_first_child() is not None:
                 groups.append(group)
+            continue
+
+        # POM niche: unique wall maps carry the dip. No coplanar card unless
+        # the author assigned a PNG (then it is a dressing card, pushed out).
+        if is_niche(pl) and not pl.texture:
             continue
 
         # N-slice UV partitioning (XOR with 3D opening)
@@ -504,10 +515,11 @@ def build_arches(
                 x_l = -width / 2.0 + x_start
                 x_r = -width / 2.0 + x_end
                 
-                bl = ctx.add_vertex(x_l, 0.0, z_bottom, u_s, v_bottom, (0.0, -1.0, 0.0))
-                br = ctx.add_vertex(x_r, 0.0, z_bottom, u_e, v_bottom, (0.0, -1.0, 0.0))
-                tr = ctx.add_vertex(x_r, 0.0, z_top, u_e, v_top, (0.0, -1.0, 0.0))
-                tl = ctx.add_vertex(x_l, 0.0, z_top, u_s, v_top, (0.0, -1.0, 0.0))
+                y_push = -_CARD_PUSH_M
+                bl = ctx.add_vertex(x_l, y_push, z_bottom, u_s, v_bottom, (0.0, -1.0, 0.0))
+                br = ctx.add_vertex(x_r, y_push, z_bottom, u_e, v_bottom, (0.0, -1.0, 0.0))
+                tr = ctx.add_vertex(x_r, y_push, z_top, u_e, v_top, (0.0, -1.0, 0.0))
+                tl = ctx.add_vertex(x_l, y_push, z_top, u_s, v_top, (0.0, -1.0, 0.0))
                 
                 poly = ctx.add_polygon([bl, br, tr, tl], egg_tex)
                 poly.set_bface_flag(True)
@@ -521,10 +533,10 @@ def build_arches(
                 t_s = x_start / width if width > 0.0 else 0.0
                 t_e = x_end / width if width > 0.0 else 1.0
                 
-                x_l = p_left[0] + t_s * dx_span
-                y_l = p_left[1] + t_s * dy_span
-                x_r = p_left[0] + t_e * dx_span
-                y_r = p_left[1] + t_e * dy_span
+                x_l = p_left[0] + t_s * dx_span + nx * _CARD_PUSH_M
+                y_l = p_left[1] + t_s * dy_span + ny * _CARD_PUSH_M
+                x_r = p_left[0] + t_e * dx_span + nx * _CARD_PUSH_M
+                y_r = p_left[1] + t_e * dy_span + ny * _CARD_PUSH_M
                 
                 bl = ctx.add_vertex(x_l, y_l, z_bottom, u_s, v_bottom, (nx, ny, 0.0))
                 br = ctx.add_vertex(x_r, y_r, z_bottom, u_e, v_bottom, (nx, ny, 0.0))

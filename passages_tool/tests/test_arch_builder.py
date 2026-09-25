@@ -54,10 +54,10 @@ def test_fixed_arch_quad(tmp_path):
     # Right edge = (2.0 + (-2.0), 3.0 + 0.0) = (0.0, 3.0)
     # Z ranges from z_offset (1.0) to z_offset + height (3.0)
     expected_positions = {
-        (0.0, 3.0, 1.0),
-        (4.0, 3.0, 1.0),
-        (4.0, 3.0, 3.0),
-        (0.0, 3.0, 3.0),
+        (0.0, 3.025, 1.0),
+        (4.0, 3.025, 1.0),
+        (4.0, 3.025, 3.0),
+        (0.0, 3.025, 3.0),
     }
 
     actual_positions = [v["pos"] for v in verts]
@@ -113,9 +113,14 @@ def test_billboard_arch(tmp_path):
     assert min(xs) == pytest.approx(-1.5)
     assert max(xs) == pytest.approx(1.5)
     for y in ys:
-        assert y == pytest.approx(0.0)
+        assert y == pytest.approx(-0.025)
     assert min(zs) == pytest.approx(0.5)
     assert max(zs) == pytest.approx(4.0)
+
+
+def test_new_arch_does_not_lock_v_to_floor():
+    pl = Polyline.make_arch((0.0, 0.0))
+    assert pl.v_at_floor is False
 
 
 def test_v_at_floor(tmp_path):

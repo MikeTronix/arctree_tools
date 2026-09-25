@@ -527,11 +527,15 @@ class PropertiesPanel:
             if fn:
                 fn(polyline.id, "z_offset", nz)
 
-        vc, nv = imgui.checkbox("V=0 at floor", polyline.v_at_floor)
+        vc, nv = imgui.checkbox("Lock V to floor", polyline.v_at_floor)
         if vc:
             fn = self._cb.get("set_field")
             if fn:
                 fn(polyline.id, "v_at_floor", nv)
+        if polyline.v_at_floor:
+            imgui.text_disabled("Texture tiles from Z=0 (door/wall alignment).")
+        else:
+            imgui.text_disabled("PNG starts at z_offset and fills the card height.")
 
         imgui.separator()
 
@@ -601,7 +605,10 @@ class PropertiesPanel:
                             fn(polyline.id, "side_texture", None)
 
             if kind == "niche":
-                imgui.text_disabled("Needs a style pack (unique wall maps + POM).")
+                imgui.text_disabled(
+                    "POM dip in the wall map — no punch, no PNG on this arch. "
+                    "For a PNG in a hole use Recess. For a PNG on the wall use Card."
+                )
             if kind == "volume":
                 imgui.text_disabled(
                     "Pilaster into the room. Door-sized width shrinks to 0.55 m."

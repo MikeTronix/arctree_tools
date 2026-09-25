@@ -178,7 +178,7 @@ Colours: **Wall** yellow (hatch ticks on the **exterior / left** side; interior 
 
 One click. If you place near a wall, the tool offers a perpendicular snap: **Enter** accepts, **Esc** or another click / tool switch keeps **billboard**.
 
-**Dressing** (fixed angle, not billboard): Kind combo — Card, Opening, Niche, Volume, Recess. Opening/Recess show Profile and Depth; Volume/Opening/Recess can Assign a side texture from the palette. Niche needs a style pack. Billboard stays a card. **Volume** is a pilaster box into the room (wall stays); picking it from a 4 m Place Arch shrinks width to 0.55 m and depth to 0.45 m. The 2D view draws that footprint.
+**Dressing** (fixed angle, not billboard): Kind combo — Card, Opening, Niche, Volume, Recess. Opening/Recess show Profile and Depth; Volume/Opening/Recess can Assign a side texture from the palette. **Niche** is a POM dip in the unique wall map (no punch, no PNG on the arch). A PNG in a hole is **Recess**. A PNG on the wall is **Card** (pushed 2.5 cm into the room so it does not z-fight). **Lock V to floor** off (new cards) maps the PNG from `z_offset` through the card height; on tiles from Z=0 like a door sheet. Assigning a PNG to a card sets height from the image if height is still the wall default. Billboard stays a card. **Volume** is a pilaster box into the room (wall stays); picking it from a 4 m Place Arch shrinks width to 0.55 m and depth to 0.45 m. The 2D view draws that footprint.
 
 ### EyePaths
 

@@ -134,7 +134,7 @@ class Arch:
     texture: Optional[str] = None
     transparency: str = "alpha_test"
     z_offset: float = 0.0
-    v_at_floor: bool = True
+    v_at_floor: bool = False  # dressing cards: PNG from z_offset. Doors check Lock V to floor.
     is_light_source: bool = False
     light_color: tuple[float, float, float] = (1.0, 0.75, 0.4)
     light_intensity: float = 1.0

@@ -466,7 +466,7 @@ Billboard arches are immune to the no-edge-on constraint during transition anima
 
 ### 12.2 Arch V-baseline convention for floor-item arches
 
-All arch textures are authored so that V = 0 corresponds to floor level (Z = 0).  For floor-item arches with `z_offset > 0`, the raised quad means V = 0 no longer aligns with Z = 0.  These arches carry an explicit boolean flag `v_at_floor: true` (default) or `v_at_floor: false`.  When `v_at_floor: true`, the converter shifts the V coordinate so the texture baseline stays at Z = 0 regardless of `z_offset`.
+Door/wall trim sheets are authored so V = 0 is the floor (Z = 0). Dressing **cards** (paintings, plaques) default `v_at_floor: false`: V = 0 is the bottom of the card (`z_offset`) and the PNG fills `height_override`. Old JSON that omits the flag still loads as `true`. When `v_at_floor` is true, the converter shifts V so the texture baseline stays at Z = 0 regardless of `z_offset` (the pattern continues as if it started on the floor — a 2 m sheet at z_offset 1 m starts at V=0.5 and wraps).
 
 ### 12.3 EyePath edge list as the render manifest
 

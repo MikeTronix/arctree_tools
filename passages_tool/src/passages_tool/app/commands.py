@@ -11,7 +11,7 @@ from passages_tool.editor.level import (
     TextureInterval,
     convert_polyline_type,
 )
-from passages_tool.editor.polyline_data import EyePath
+from passages_tool.editor.polyline_data import Arch, EyePath
 from passages_tool.io.level_format import LevelIOError, load, save
 
 
@@ -123,6 +123,19 @@ class CommandsMixin:
     def _cb_set_texture(self, pid: str, tex: Optional[str]) -> None:
         self._hist()
         self._level.set_polyline_texture(pid, tex)
+        pl = self._level.get_polyline(pid)
+        if isinstance(pl, Arch) and tex:
+            kind = getattr(pl, "kind", None)
+            if kind not in ("opening", "volume", "recess"):
+                pl.v_at_floor = False
+                if pl.height_override is None:
+                    from passages_tool.converter.wall_builder import get_texture_size
+                    ppm = float(self._level.meta.pixels_per_meter) or 256.0
+                    folder = getattr(self._palette._mgr, "base_dir", None)
+                    _tw, th = get_texture_size(tex, folder)
+                    if th > 0:
+                        pl.height_override = th / ppm
+        self._pm.rebuild_one(pid)
 
     def _cb_move_vertex(self, pid: str, idx: int, x: float, z: float) -> None:
         self._hist(f"move:{pid}:{idx}")
@@ -194,6 +207,8 @@ class CommandsMixin:
                 from passages_tool.converter.opening import apply_volume_kind_defaults
 
                 apply_volume_kind_defaults(pl)
+            if field == "kind" and value in (None, "", "card"):
+                pl.v_at_floor = False
             self._level.dirty = True
         self._pm.rebuild_one(pid)
 
